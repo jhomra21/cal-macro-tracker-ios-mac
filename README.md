@@ -8,7 +8,7 @@ A native SwiftUI calorie and macro tracking app for iPhone. No account required 
 - **Food logging** — log by servings or grams with deterministic macro math
 - **Barcode scanning** — live camera or photo-based barcode detection via Vision/AVFoundation, with product lookup from Open Food Facts
 - **Nutrition label scanning** — photo-based OCR via Vision text recognition with deterministic label parsing
-- **Food search** — search USDA FoodData Central and Open Food Facts through a Cloudflare Worker proxy (no API key shipped in the client)
+- **Food search** — search USDA FoodData Central and Open Food Facts through a Cloudflare Worker
 - **Common foods** — bundled seed database of common foods for quick offline logging
 - **Custom foods** — create and edit your own food items
 - **History** — calendar-based view of past daily logs with day summaries
@@ -119,8 +119,7 @@ Individual targets:
 ## Architecture
 
 - **SwiftUI + SwiftData** — views use `@Query`, `@State`, `@Environment`, and `@Observable` directly; no view-model layer
-- **Feature-organized** — code grouped by feature area, not by technical layer
-- **Deterministic nutrition math** — macros computed from per-serving values × quantity; original label values preserved
+- **Nutrition math** — macros computed from per-serving values × quantity; original label values preserved
 - **Local-first** — SwiftData on-device persistence with no required network; remote search is additive
 - **Thin adapters** — Open Food Facts client, USDA proxy client, and OCR recognizer are isolated I/O boundaries
 
