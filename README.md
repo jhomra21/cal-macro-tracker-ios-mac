@@ -2,6 +2,14 @@
 
 A native SwiftUI calorie and macro tracking app for iPhone. No account required — all data stays on-device.
 
+## Screenshots
+
+<p align="center">
+  <img src="media-assets/home1.jpeg" alt="Home screen overview" width="300" />
+  &nbsp;&nbsp;
+  <img src="media-assets/home2.jpeg" alt="Home screen detail" width="300" />
+</p>
+
 ## Features
 
 - **Dashboard** — daily calorie ring with protein / carbs / fat breakdown, compact summary on scroll, and full log entry list
