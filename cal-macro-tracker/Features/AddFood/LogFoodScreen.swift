@@ -1,11 +1,16 @@
 import SwiftData
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct LogFoodScreen: View {
     @Environment(\.modelContext) private var modelContext
 
     let logDate: Date
     let initialDraft: FoodDraft
+    let reviewNotes: [String]
+    let previewImageData: Data?
     let onFoodLogged: () -> Void
 
     @State private var draft: FoodDraft
@@ -14,11 +19,22 @@ struct LogFoodScreen: View {
     @State private var gramsAmount: Double
     @State private var numericText: FoodDraftNumericText
     @State private var errorMessage: String?
+    #if os(iOS)
+    @State private var showingPreviewImage = false
+    #endif
     @FocusState private var focusedField: FoodDraftField?
 
-    init(logDate: Date, initialDraft: FoodDraft, onFoodLogged: @escaping () -> Void = {}) {
+    init(
+        logDate: Date,
+        initialDraft: FoodDraft,
+        reviewNotes: [String] = [],
+        previewImageData: Data? = nil,
+        onFoodLogged: @escaping () -> Void = {}
+    ) {
         self.logDate = logDate
         self.initialDraft = initialDraft
+        self.reviewNotes = reviewNotes
+        self.previewImageData = previewImageData
         self.onFoodLogged = onFoodLogged
         _draft = State(initialValue: initialDraft)
         _quantityMode = State(initialValue: .servings)
@@ -31,24 +47,37 @@ struct LogFoodScreen: View {
         quantityMode == .servings ? servingsAmount : gramsAmount
     }
 
-    private var shouldSaveCustomFood: Bool {
-        draft.saveAsCustomFood || (initialDraft.source == .common && hasMeaningfulChangesFromInitial)
-    }
-
-    private var hasMeaningfulChangesFromInitial: Bool {
-        draft.name != initialDraft.name ||
-        draft.brand != initialDraft.brand ||
-        draft.servingDescription != initialDraft.servingDescription ||
-        draft.gramsPerServing != initialDraft.gramsPerServing ||
-        draft.caloriesPerServing != initialDraft.caloriesPerServing ||
-        draft.proteinPerServing != initialDraft.proteinPerServing ||
-        draft.fatPerServing != initialDraft.fatPerServing ||
-        draft.carbsPerServing != initialDraft.carbsPerServing
+    private var reusableFoodPersistenceMode: ReusableFoodPersistenceMode {
+        FoodDraft.reusableFoodPersistenceMode(initialDraft: initialDraft, currentDraft: draft)
     }
 
     private var canSave: Bool {
         guard let finalizedDraft = numericText.finalizedDraft(from: draft) else { return false }
         return finalizedDraft.canLog(quantityMode: quantityMode, quantityAmount: activeAmount)
+    }
+
+    private var hasPreviewImage: Bool {
+        previewImageData != nil
+    }
+
+    private var shouldShowReviewSection: Bool {
+        reviewNotes.isEmpty == false || hasPreviewImage || draft.sourceNameOrNil != nil || sourceURL != nil
+    }
+
+    private var reviewSectionTitle: String {
+        switch initialDraft.source {
+        case .labelScan:
+            return "Label Scan"
+        case .searchLookup:
+            return "Online Packaged Food"
+        case .common, .custom, .barcodeLookup:
+            return "Review"
+        }
+    }
+
+    private var sourceURL: URL? {
+        guard let sourceURL = draft.sourceURLOrNil else { return nil }
+        return URL(string: sourceURL)
     }
 
     var body: some View {
@@ -62,6 +91,37 @@ struct LogFoodScreen: View {
             keyboardFields: FoodDraftField.formOrder,
             previewTotals: nil
         ) {
+            if shouldShowReviewSection {
+                Section(reviewSectionTitle) {
+                    ForEach(reviewNotes, id: \.self) { note in
+                        Text(note)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let sourceName = draft.sourceNameOrNil {
+                        LabeledContent("Source") {
+                            Text(sourceName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let sourceURL {
+                        Link(destination: sourceURL) {
+                            Label("View Source", systemImage: "link")
+                        }
+                    }
+
+                    if hasPreviewImage {
+                        Button("Preview Captured Image") {
+                            #if os(iOS)
+                            showingPreviewImage = true
+                            #endif
+                        }
+                    }
+                }
+            }
+
             Section("Quantity") {
                 Picker("Mode", selection: $quantityMode) {
                     Text("Servings").tag(QuantityMode.servings)
@@ -93,11 +153,18 @@ struct LogFoodScreen: View {
             }
         } footerSections: {
             Section {
-                Toggle("Save as reusable custom food", isOn: $draft.saveAsCustomFood)
-                if hasMeaningfulChangesFromInitial && initialDraft.source == .common {
-                    Text("Because you changed a common food, a custom copy will be saved automatically.")
+                Toggle("Save as reusable food", isOn: $draft.saveAsCustomFood)
+                switch reusableFoodPersistenceMode {
+                case .autoCreateFromCommonEdits:
+                    Text("Because you changed a common food, a reusable copy will be saved automatically.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                case .autoUpdateExistingExternalFood:
+                    Text("Because you changed a saved external food, the reusable local copy will be updated automatically.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                case .none, .userRequested:
+                    EmptyView()
                 }
             }
         }
@@ -108,6 +175,29 @@ struct LogFoodScreen: View {
         }
         .navigationTitle("Log Food")
         .inlineNavigationTitle()
+        #if os(iOS)
+        .sheet(isPresented: $showingPreviewImage) {
+            if let previewImageData, let previewImage = UIImage(data: previewImageData) {
+                NavigationStack {
+                    ScrollView {
+                        Image(uiImage: previewImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                    }
+                    .background(Color.black.opacity(0.95))
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                showingPreviewImage = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #endif
         .onAppear {
             if !draft.canLogByGrams {
                 quantityMode = .servings
@@ -133,7 +223,7 @@ struct LogFoodScreen: View {
 
             try logEntryRepository.logFood(
                 draft: finalizedDraft,
-                shouldSaveCustomFood: shouldSaveCustomFood,
+                reusableFoodPersistenceMode: reusableFoodPersistenceMode,
                 logDate: logDate,
                 quantityMode: quantityMode,
                 quantityAmount: activeAmount,

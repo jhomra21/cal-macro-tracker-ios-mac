@@ -23,7 +23,8 @@ enum CommonFoodSeedLoader {
 
     static func commonFoodSeedURL() throws -> URL {
         guard let url = Bundle.main.url(forResource: "common_foods", withExtension: "json") else {
-            throw NSError(domain: "CommonFoodSeedLoader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Missing common_foods.json resource."])
+            throw NSError(
+                domain: "CommonFoodSeedLoader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Missing common_foods.json resource."])
         }
 
         return url

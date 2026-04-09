@@ -6,12 +6,13 @@ enum AppBootstrap {
     struct Plan: Sendable {
         let shouldSeedCommonFoods: Bool
         let shouldSeedGoals: Bool
+        let shouldRepairReusableFoodSearchIndexes: Bool
     }
 
     static func bootstrapIfNeeded(in container: ModelContainer) async throws {
         let planningContext = ModelContext(container)
         let plan = try makePlan(modelContext: planningContext)
-        guard plan.shouldSeedCommonFoods || plan.shouldSeedGoals else { return }
+        guard plan.shouldSeedCommonFoods || plan.shouldSeedGoals || plan.shouldRepairReusableFoodSearchIndexes else { return }
 
         let commonFoodRecords = try plan.shouldSeedCommonFoods ? await CommonFoodSeedLoader.commonFoodSeedRecords() : []
         let writeContext = ModelContext(container)
@@ -23,6 +24,10 @@ enum AppBootstrap {
         if plan.shouldSeedGoals {
             try seedGoalsIfNeeded(modelContext: writeContext)
         }
+
+        if plan.shouldRepairReusableFoodSearchIndexes {
+            try repairReusableFoodSearchIndexesIfNeeded(modelContext: writeContext)
+        }
     }
 
     static func bootstrapPreview(modelContext: ModelContext) throws {
@@ -33,7 +38,8 @@ enum AppBootstrap {
     private static func makePlan(modelContext: ModelContext) throws -> Plan {
         Plan(
             shouldSeedCommonFoods: try shouldSeedCommonFoods(modelContext: modelContext),
-            shouldSeedGoals: try shouldSeedGoals(modelContext: modelContext)
+            shouldSeedGoals: try shouldSeedGoals(modelContext: modelContext),
+            shouldRepairReusableFoodSearchIndexes: try shouldRepairReusableFoodSearchIndexes(modelContext: modelContext)
         )
     }
 
@@ -45,6 +51,27 @@ enum AppBootstrap {
 
     private static func shouldSeedGoals(modelContext: ModelContext) throws -> Bool {
         try modelContext.fetchCount(FetchDescriptor<DailyGoals>()) == 0
+    }
+
+    private static func shouldRepairReusableFoodSearchIndexes(modelContext: ModelContext) throws -> Bool {
+        try reusableFoodsNeedingSearchIndexRepair(modelContext: modelContext).isEmpty == false
+    }
+
+    private static func repairReusableFoodSearchIndexesIfNeeded(modelContext: ModelContext) throws {
+        let foods = try reusableFoodsNeedingSearchIndexRepair(modelContext: modelContext)
+        guard foods.isEmpty == false else { return }
+
+        try PersistenceReporter.persist(modelContext: modelContext, operation: "Repair reusable food search indexes") {
+            foods.forEach { food in
+                food.updateSearchableText(updateTimestamp: false)
+            }
+        }
+    }
+
+    private static func reusableFoodsNeedingSearchIndexRepair(modelContext: ModelContext) throws -> [FoodItem] {
+        let commonSource = FoodSource.common.rawValue
+        let descriptor = FetchDescriptor<FoodItem>(predicate: #Predicate { $0.source != commonSource })
+        return try modelContext.fetch(descriptor).filter(\.needsSearchableTextRepair)
     }
 
     private static func seedGoalsIfNeeded(modelContext: ModelContext) throws {

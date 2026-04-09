@@ -142,9 +142,8 @@ Individual targets:
 | Target | What it does |
 |---|---|
 | `make quality-build` | Verifies the Xcode target builds |
-| `make quality-lint` | Runs SwiftLint (reports install instructions if missing) |
-| `make quality-format-check` | Runs SwiftFormat in lint mode |
-| `make format` | Applies SwiftFormat to app source |
+| `make quality-format-check` | Runs the official `swift-format` formatter in lint mode |
+| `make format` | Applies the official `swift-format` formatter to app source |
 | `make quality-dead` | Runs Periphery dead-code detection |
 | `make quality-dup` | Scans for duplicated code blocks |
 | `make quality-debt` | Flags TODO/FIXME/HACK, `fatalError`, oversized files/functions |
@@ -154,8 +153,7 @@ Individual targets:
 
 ### Optional tooling
 
-- [SwiftLint](https://github.com/realm/SwiftLint) — `brew install swiftlint`
-- [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) — `brew install swiftformat`
+- [swift-format](https://github.com/swiftlang/swift-format) — official Swift formatter — `brew install swift-format`
 - [Periphery](https://github.com/peripheryapp/periphery) — `brew install periphery`
 
 ## Architecture

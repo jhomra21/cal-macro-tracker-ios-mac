@@ -34,10 +34,35 @@ struct NutrientInputField<Field: Hashable>: View {
                     .frame(width: suffixWidth, alignment: .leading)
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            focusFieldIfNeeded()
+        }
     }
 
     @ViewBuilder
     private var fieldView: some View {
+        #if os(iOS)
+        if let focusBinding {
+            TrailingCaretNumericTextField(
+                title: title,
+                text: $text,
+                isFocused: focusBinding
+            )
+            .frame(minWidth: 72)
+        } else if let focusedField, let field {
+            TextField(title, text: $text)
+                .focused(focusedField, equals: field)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 72)
+                .numericKeyboard()
+        } else {
+            TextField(title, text: $text)
+                .multilineTextAlignment(.trailing)
+                .frame(minWidth: 72)
+                .numericKeyboard()
+        }
+        #else
         if let focusedField, let field {
             TextField(title, text: $text)
                 .focused(focusedField, equals: field)
@@ -50,9 +75,32 @@ struct NutrientInputField<Field: Hashable>: View {
                 .frame(minWidth: 72)
                 .numericKeyboard()
         }
+        #endif
     }
 
     private var suffixWidth: CGFloat {
         suffix.count > 1 ? 36 : 24
+    }
+
+    private var focusBinding: Binding<Bool>? {
+        guard let focusedField, let field else { return nil }
+
+        return Binding(
+            get: {
+                focusedField.wrappedValue == field
+            },
+            set: { isFocused in
+                if isFocused {
+                    focusedField.wrappedValue = field
+                } else if focusedField.wrappedValue == field {
+                    focusedField.wrappedValue = nil
+                }
+            }
+        )
+    }
+
+    private func focusFieldIfNeeded() {
+        guard let focusedField, let field else { return }
+        focusedField.wrappedValue = field
     }
 }

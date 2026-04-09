@@ -19,22 +19,6 @@ struct NutritionMath {
         }
     }
 
-    static func caloriesProgress(consumed: Double, goal: Double) -> Double {
-        guard goal > 0 else { return 0 }
-        return min(max(consumed / goal, 0), 1)
-    }
-
-    static func macroShare(snapshot: NutritionSnapshot) -> (protein: Double, carbs: Double, fat: Double) {
-        let total = max(snapshot.protein + snapshot.carbs + snapshot.fat, 0)
-        guard total > 0 else { return (0, 0, 0) }
-
-        return (
-            protein: snapshot.protein / total,
-            carbs: snapshot.carbs / total,
-            fat: snapshot.fat / total
-        )
-    }
-
     static func consumedNutrition(for food: FoodDraft, mode: QuantityMode, amount: Double) -> NutritionSnapshot {
         guard amount > 0 else { return .zero }
 

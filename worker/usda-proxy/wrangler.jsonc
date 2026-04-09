@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cal-macro-tracker-usda-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "secrets": {
+    "required": ["USDA_API_KEY"]
+  }
+}

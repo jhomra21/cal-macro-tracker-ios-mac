@@ -35,12 +35,27 @@ enum FoodDraftValidationError: LocalizedError {
     }
 }
 
+enum ReusableFoodPersistenceMode: Equatable {
+    case none
+    case userRequested
+    case autoCreateFromCommonEdits
+    case autoUpdateExistingExternalFood
+
+    var shouldPersistReusableFood: Bool {
+        self != .none
+    }
+}
+
 struct FoodDraft: Identifiable, Hashable {
     var id: UUID = UUID()
     var foodItemID: UUID?
     var name: String = ""
     var brand: String = ""
     var source: FoodSource = .custom
+    var barcode: String = ""
+    var externalProductID: String = ""
+    var sourceName: String = ""
+    var sourceURL: String = ""
     var servingDescription: String = "1 serving"
     var gramsPerServing: Double?
     var caloriesPerServing: Double = 0
@@ -57,6 +72,10 @@ struct FoodDraft: Identifiable, Hashable {
         self.name = foodItem.name
         self.brand = foodItem.brand ?? ""
         self.source = foodItem.sourceKind
+        self.barcode = foodItem.barcode ?? ""
+        self.externalProductID = foodItem.externalProductID ?? ""
+        self.sourceName = foodItem.sourceName ?? ""
+        self.sourceURL = foodItem.sourceURL ?? ""
         self.servingDescription = foodItem.servingDescription
         self.gramsPerServing = foodItem.gramsPerServing
         self.caloriesPerServing = foodItem.caloriesPerServing
@@ -66,8 +85,38 @@ struct FoodDraft: Identifiable, Hashable {
         self.saveAsCustomFood = saveAsCustomFood
     }
 
+    init(logEntry: LogEntry, saveAsCustomFood: Bool = false) {
+        self.id = UUID()
+        self.name = logEntry.foodName
+        self.brand = logEntry.brand ?? ""
+        self.source = logEntry.sourceKind
+        self.servingDescription = logEntry.servingDescription
+        self.gramsPerServing = logEntry.gramsPerServing
+        self.caloriesPerServing = logEntry.caloriesPerServing
+        self.proteinPerServing = logEntry.proteinPerServing
+        self.fatPerServing = logEntry.fatPerServing
+        self.carbsPerServing = logEntry.carbsPerServing
+        self.saveAsCustomFood = saveAsCustomFood
+    }
+
     var brandOrNil: String? {
-        brand.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : brand.trimmingCharacters(in: .whitespacesAndNewlines)
+        FoodDraft.trimmedText(from: brand)
+    }
+
+    var barcodeOrNil: String? {
+        FoodDraft.trimmedText(from: barcode)
+    }
+
+    var externalProductIDOrNil: String? {
+        FoodDraft.trimmedText(from: externalProductID)
+    }
+
+    var sourceNameOrNil: String? {
+        FoodDraft.trimmedText(from: sourceName)
+    }
+
+    var sourceURLOrNil: String? {
+        FoodDraft.trimmedText(from: sourceURL)
     }
 
     var canLogByGrams: Bool {
@@ -82,6 +131,42 @@ struct FoodDraft: Identifiable, Hashable {
 
     var canSaveReusableFood: Bool {
         validationErrorForSaving() == nil
+    }
+
+    func hasMeaningfulChanges(comparedTo other: FoodDraft) -> Bool {
+        let normalizedDraft = normalized()
+        let normalizedOther = other.normalized()
+
+        return normalizedDraft.name != normalizedOther.name
+            || normalizedDraft.brand != normalizedOther.brand
+            || normalizedDraft.servingDescription != normalizedOther.servingDescription
+            || normalizedDraft.gramsPerServing != normalizedOther.gramsPerServing
+            || normalizedDraft.caloriesPerServing != normalizedOther.caloriesPerServing
+            || normalizedDraft.proteinPerServing != normalizedOther.proteinPerServing
+            || normalizedDraft.fatPerServing != normalizedOther.fatPerServing
+            || normalizedDraft.carbsPerServing != normalizedOther.carbsPerServing
+    }
+
+    static func reusableFoodPersistenceMode(initialDraft: FoodDraft, currentDraft: FoodDraft) -> ReusableFoodPersistenceMode {
+        let normalizedInitialDraft = initialDraft.normalized()
+        let normalizedCurrentDraft = currentDraft.normalized()
+
+        if normalizedCurrentDraft.saveAsCustomFood {
+            return .userRequested
+        }
+
+        guard normalizedCurrentDraft.hasMeaningfulChanges(comparedTo: normalizedInitialDraft) else {
+            return .none
+        }
+
+        switch normalizedInitialDraft.source {
+        case .common:
+            return .autoCreateFromCommonEdits
+        case .custom:
+            return .none
+        case .barcodeLookup, .labelScan, .searchLookup:
+            return normalizedInitialDraft.foodItemID == nil ? .none : .autoUpdateExistingExternalFood
+        }
     }
 
     func canLog(quantityMode: QuantityMode, quantityAmount: Double) -> Bool {
@@ -142,17 +227,25 @@ struct FoodDraft: Identifiable, Hashable {
         var draft = self
         draft.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         draft.brand = brandOrNil ?? ""
+        draft.barcode = barcodeOrNil ?? ""
+        draft.externalProductID = externalProductIDOrNil ?? ""
+        draft.sourceName = sourceNameOrNil ?? ""
+        draft.sourceURL = sourceURLOrNil ?? ""
         draft.servingDescription = servingDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         return draft
     }
 
-    func makeCustomFoodItem() -> FoodItem {
+    func makeReusableFoodItem(sourceOverride: FoodSource? = nil) -> FoodItem {
         let draft = normalized()
 
         return FoodItem(
             name: draft.name,
             brand: draft.brandOrNil,
-            source: .custom,
+            source: sourceOverride ?? draft.source,
+            barcode: draft.barcodeOrNil,
+            externalProductID: draft.externalProductIDOrNil,
+            sourceName: draft.sourceNameOrNil,
+            sourceURL: draft.sourceURLOrNil,
             servingDescription: draft.servingDescription,
             gramsPerServing: draft.gramsPerServing,
             caloriesPerServing: draft.caloriesPerServing,
@@ -160,5 +253,14 @@ struct FoodDraft: Identifiable, Hashable {
             fatPerServing: draft.fatPerServing,
             carbsPerServing: draft.carbsPerServing
         )
+    }
+
+    func makeCustomFoodItem() -> FoodItem {
+        makeReusableFoodItem(sourceOverride: .custom)
+    }
+
+    private static func trimmedText(from value: String) -> String? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? nil : trimmedValue
     }
 }

@@ -3,6 +3,9 @@ import Foundation
 enum FoodSource: String, Codable, CaseIterable {
     case common
     case custom
+    case barcodeLookup
+    case labelScan
+    case searchLookup
 }
 
 enum QuantityMode: String, Codable, CaseIterable {
@@ -68,7 +71,7 @@ enum NumericText {
 
     private static let numberStyle = FloatingPointFormatStyle<Double>.number
         .grouping(.never)
-        .precision(.fractionLength(0 ... 16))
+        .precision(.fractionLength(0...16))
         .locale(.current)
 }
 
@@ -92,6 +95,17 @@ extension Date {
         Calendar.current.startOfDay(for: self)
     }
 
+    var weekDates: [Date] {
+        guard let interval = Calendar.current.dateInterval(of: .weekOfYear, for: startOfDayValue) else {
+            return [startOfDayValue]
+        }
+
+        let weekStart = interval.start.startOfDayValue
+        return (0..<7).compactMap { offset in
+            Calendar.current.date(byAdding: .day, value: offset, to: weekStart)?.startOfDayValue
+        }
+    }
+
     var dayInterval: DayInterval {
         let start = startOfDayValue
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start) ?? start
@@ -104,5 +118,27 @@ extension Date {
         }
 
         return formatted(date: .abbreviated, time: .omitted)
+    }
+
+    var weekdayNarrowTitle: String {
+        formatted(.dateTime.weekday(.narrow))
+    }
+
+    var weekdayAccessibilityTitle: String {
+        formatted(.dateTime.weekday(.wide).month(.wide).day())
+    }
+
+    var historyNavigationTitle: String {
+        let dateTitle = formatted(.dateTime.month(.abbreviated).day().year())
+
+        if Calendar.current.isDateInToday(self) {
+            return "Today, \(dateTitle)"
+        }
+
+        return "\(formatted(.dateTime.weekday(.wide))), \(dateTitle)"
+    }
+
+    var timeTitle: String {
+        formatted(date: .omitted, time: .shortened)
     }
 }

@@ -19,7 +19,7 @@ enum FoodDraftField: Hashable {
         .calories,
         .protein,
         .fat,
-        .carbs,
+        .carbs
     ]
 }
 

@@ -60,7 +60,8 @@ Prefer the most concise and elegant solutions that changes or adds as little cod
 - Run a single test:
   - Not available until a test target is added.
 - Lint / formatting:
-  - No SwiftLint, SwiftFormat, or other lint tooling is configured in the repository.
+  - The repository formatter is the official `swift-format` tool, wired through `make quality-format-check` and `make format` with the root `.swift-format` configuration.
+  - No Apple/Swift-official linter is part of the documented repository workflow today.
 
 ## Current Codebase Shape
 

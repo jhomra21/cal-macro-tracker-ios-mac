@@ -7,6 +7,10 @@ final class FoodItem {
     var name: String
     var brand: String?
     var source: String
+    var barcode: String?
+    var externalProductID: String?
+    var sourceName: String?
+    var sourceURL: String?
     var servingDescription: String
     var gramsPerServing: Double?
     var caloriesPerServing: Double
@@ -22,6 +26,10 @@ final class FoodItem {
         name: String,
         brand: String? = nil,
         source: FoodSource,
+        barcode: String? = nil,
+        externalProductID: String? = nil,
+        sourceName: String? = nil,
+        sourceURL: String? = nil,
         servingDescription: String,
         gramsPerServing: Double? = nil,
         caloriesPerServing: Double,
@@ -36,13 +44,17 @@ final class FoodItem {
         self.name = name
         self.brand = brand
         self.source = source.rawValue
+        self.barcode = barcode
+        self.externalProductID = externalProductID
+        self.sourceName = sourceName
+        self.sourceURL = sourceURL
         self.servingDescription = servingDescription
         self.gramsPerServing = gramsPerServing
         self.caloriesPerServing = caloriesPerServing
         self.proteinPerServing = proteinPerServing
         self.fatPerServing = fatPerServing
         self.carbsPerServing = carbsPerServing
-        self.searchableText = FoodItem.makeSearchableText(name: name, brand: brand, aliases: aliases)
+        self.searchableText = FoodItem.makeSearchableText(name: name, brand: brand, barcode: barcode, aliases: aliases)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -56,25 +68,54 @@ final class FoodItem {
         return gramsPerServing > 0
     }
 
+    var expectedSearchableText: String {
+        FoodItem.makeSearchableText(name: name, brand: brand, barcode: barcode, aliases: [])
+    }
+
+    var needsSearchableTextRepair: Bool {
+        searchableText != expectedSearchableText
+    }
+
     func normalizeForPersistence() {
         name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         servingDescription = servingDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let trimmedBrand = brand?.trimmingCharacters(in: .whitespacesAndNewlines)
-        brand = (trimmedBrand?.isEmpty == false) ? trimmedBrand : nil
+        brand = FoodItem.trimmedText(from: brand)
+        barcode = FoodItem.trimmedText(from: barcode)
+        externalProductID = FoodItem.trimmedText(from: externalProductID)
+        sourceName = FoodItem.trimmedText(from: sourceName)
+        sourceURL = FoodItem.trimmedText(from: sourceURL)
 
         updateSearchableText()
     }
 
-    func updateSearchableText(with aliases: [String] = []) {
-        searchableText = FoodItem.makeSearchableText(name: name, brand: brand, aliases: aliases)
-        updatedAt = .now
+    func updateSearchableText(with aliases: [String] = [], updateTimestamp: Bool = true) {
+        searchableText = FoodItem.makeSearchableText(name: name, brand: brand, barcode: barcode, aliases: aliases)
+        if updateTimestamp {
+            updatedAt = .now
+        }
     }
 
-    private static func makeSearchableText(name: String, brand: String?, aliases: [String]) -> String {
-        ([name, brand] + aliases)
-            .compactMap { $0 }
+    private static func makeSearchableText(name: String, brand: String?, barcode: String?, aliases: [String]) -> String {
+        var seen = Set<String>()
+        return ([name, brand, barcode] + aliases)
+            .compactMap(normalizedSearchValue)
+            .filter { seen.insert($0).inserted }
             .joined(separator: " ")
-            .lowercased()
+    }
+
+    private static func normalizedSearchValue(_ value: String?) -> String? {
+        guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !trimmedValue.isEmpty else {
+            return nil
+        }
+
+        return trimmedValue
+    }
+
+    private static func trimmedText(from value: String?) -> String? {
+        guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedValue.isEmpty else {
+            return nil
+        }
+
+        return trimmedValue
     }
 }

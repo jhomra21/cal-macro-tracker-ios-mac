@@ -14,7 +14,9 @@ struct DailyGoalsRepository {
 
         try PersistenceReporter.persist(in: modelContext.container, operation: operation) { isolatedContext in
             guard let isolatedGoals = isolatedContext.model(for: goalsID) as? DailyGoals else {
-                throw NSError(domain: "DailyGoalsRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load daily goals for saving."])
+                throw NSError(
+                    domain: "DailyGoalsRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load daily goals for saving."]
+                )
             }
 
             draft.apply(to: isolatedGoals)

@@ -29,7 +29,8 @@ struct EditLogEntryScreen: View {
         initialDraft.carbsPerServing = entry.carbsPerServing
         initialDraft.saveAsCustomFood = false
 
-        let initialQuantityAmountText = NumericText.editingDisplay(for: entry.quantityModeKind == .servings ? entry.servingsConsumed : entry.gramsConsumed)
+        let initialQuantityAmountText = NumericText.editingDisplay(
+            for: entry.quantityModeKind == .servings ? entry.servingsConsumed : entry.gramsConsumed)
         _draft = State(initialValue: initialDraft)
         _numericText = State(initialValue: FoodDraftNumericText(draft: initialDraft))
         _quantityMode = State(initialValue: entry.quantityModeKind)

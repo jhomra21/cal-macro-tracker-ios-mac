@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-config_path=".swiftformat"
+config_path=".swift-format"
 mode="lint"
 target_path="cal-macro-tracker"
 
@@ -27,22 +27,22 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ ! -f "$config_path" ]; then
-  echo "error: missing SwiftFormat config: $config_path" >&2
+  echo "error: missing swift-format config: $config_path" >&2
   exit 1
 fi
 
-if ! command -v swiftformat >/dev/null 2>&1; then
-  echo "warning: swiftformat is not installed; skipping format check."
-  echo "install with: brew install swiftformat"
+if ! command -v swift-format >/dev/null 2>&1; then
+  echo "warning: swift-format is not installed; skipping format check."
+  echo "install with: brew install swift-format"
   exit 0
 fi
 
 case "$mode" in
   lint)
-    swiftformat "$target_path" --lint --config "$config_path"
+    swift-format lint --strict --parallel --recursive --configuration "$config_path" "$target_path"
     ;;
   format)
-    swiftformat "$target_path" --config "$config_path"
+    swift-format format --in-place --parallel --recursive --configuration "$config_path" "$target_path"
     ;;
   *)
     echo "error: unsupported mode: $mode" >&2

@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-struct CustomFoodEditorScreen: View {
+struct ReusableFoodEditorScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
@@ -27,6 +27,52 @@ struct CustomFoodEditorScreen: View {
         return finalizedDraft.canSaveReusableFood
     }
 
+    private var sourceURL: URL? {
+        guard let sourceURL = draft.sourceURLOrNil else { return nil }
+        return URL(string: sourceURL)
+    }
+
+    private var navigationTitle: String {
+        switch food.sourceKind {
+        case .common:
+            return "Food"
+        case .custom:
+            return "Custom Food"
+        case .barcodeLookup, .labelScan, .searchLookup:
+            return "Saved Food"
+        }
+    }
+
+    private var saveOperationName: String {
+        switch food.sourceKind {
+        case .common:
+            return "Save food"
+        case .custom:
+            return "Save custom food"
+        case .barcodeLookup:
+            return "Save barcode food"
+        case .labelScan:
+            return "Save label scan food"
+        case .searchLookup:
+            return "Save searched food"
+        }
+    }
+
+    private var deleteOperationName: String {
+        switch food.sourceKind {
+        case .common:
+            return "Delete food"
+        case .custom:
+            return "Delete custom food"
+        case .barcodeLookup:
+            return "Delete barcode food"
+        case .labelScan:
+            return "Delete label scan food"
+        case .searchLookup:
+            return "Delete searched food"
+        }
+    }
+
     var body: some View {
         FoodDraftEditorForm(
             draft: $draft,
@@ -38,7 +84,22 @@ struct CustomFoodEditorScreen: View {
             keyboardFields: FoodDraftField.formOrder,
             previewTotals: nil
         ) {
-            EmptyView()
+            if draft.sourceNameOrNil != nil || sourceURL != nil {
+                Section("Source") {
+                    if let sourceName = draft.sourceNameOrNil {
+                        LabeledContent("Provider") {
+                            Text(sourceName)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let sourceURL {
+                        Link(destination: sourceURL) {
+                            Label("View Source", systemImage: "link")
+                        }
+                    }
+                }
+            }
         } footerSections: {
             Section {
                 Button("Save") {
@@ -50,7 +111,7 @@ struct CustomFoodEditorScreen: View {
             Section {
                 Button("Delete Food", role: .destructive) {
                     do {
-                        try foodRepository.deleteCustomFood(food, operation: "Delete custom food")
+                        try foodRepository.deleteReusableFood(food, operation: deleteOperationName)
                         dismiss()
                     } catch {
                         errorMessage = error.localizedDescription
@@ -59,7 +120,7 @@ struct CustomFoodEditorScreen: View {
                 }
             }
         }
-        .navigationTitle("Custom Food")
+        .navigationTitle(navigationTitle)
         .inlineNavigationTitle()
     }
 
@@ -70,7 +131,7 @@ struct CustomFoodEditorScreen: View {
                 return
             }
 
-            let persistedFood = try foodRepository.saveReusableCustomFood(from: finalizedDraft, operation: "Save custom food")
+            let persistedFood = try foodRepository.saveReusableFood(from: finalizedDraft, operation: saveOperationName)
             draft = FoodDraft(foodItem: persistedFood, saveAsCustomFood: true)
             dismiss()
         } catch {

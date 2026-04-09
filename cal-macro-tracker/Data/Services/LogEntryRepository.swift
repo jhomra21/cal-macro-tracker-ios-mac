@@ -15,7 +15,8 @@ struct LogEntryRepository {
 
         try PersistenceReporter.persist(in: modelContext.container, operation: operation) { isolatedContext in
             guard let isolatedEntry = isolatedContext.model(for: entryID) as? LogEntry else {
-                throw NSError(domain: "LogEntryRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load log entry for saving."])
+                throw NSError(
+                    domain: "LogEntryRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load log entry for saving."])
             }
 
             apply(
@@ -32,16 +33,32 @@ struct LogEntryRepository {
 
         try PersistenceReporter.persist(in: modelContext.container, operation: operation) { isolatedContext in
             guard let isolatedEntry = isolatedContext.model(for: entryID) as? LogEntry else {
-                throw NSError(domain: "LogEntryRepository", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to load log entry for deletion."])
+                throw NSError(
+                    domain: "LogEntryRepository", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to load log entry for deletion."])
             }
 
             isolatedContext.delete(isolatedEntry)
         }
     }
 
+    func logAgain(entry: LogEntry, logDate: Date, operation: String) throws {
+        let draft = FoodDraft(logEntry: entry, saveAsCustomFood: false)
+        let quantityMode = entry.quantityModeKind
+        let quantityAmount = quantityMode == .servings ? (entry.servingsConsumed ?? 0) : (entry.gramsConsumed ?? 0)
+
+        try logFood(
+            draft: draft,
+            reusableFoodPersistenceMode: .none,
+            logDate: logDate,
+            quantityMode: quantityMode,
+            quantityAmount: quantityAmount,
+            operation: operation
+        )
+    }
+
     func logFood(
         draft: FoodDraft,
-        shouldSaveCustomFood: Bool,
+        reusableFoodPersistenceMode: ReusableFoodPersistenceMode,
         logDate: Date,
         quantityMode: QuantityMode,
         quantityAmount: Double,
@@ -54,11 +71,13 @@ struct LogEntryRepository {
 
         try PersistenceReporter.persist(in: modelContext.container, operation: operation) { isolatedContext in
             let foodRepository = FoodItemRepository(modelContext: isolatedContext)
-            let storedFood = shouldSaveCustomFood ? try foodRepository.upsertReusableCustomFood(from: normalizedDraft, in: isolatedContext) : nil
+            let storedFood =
+                reusableFoodPersistenceMode.shouldPersistReusableFood
+                ? try foodRepository.upsertReusableFood(from: normalizedDraft, in: isolatedContext)
+                : nil
             let entry = makeLogEntry(
                 draft: normalizedDraft,
                 storedFood: storedFood,
-                shouldSaveCustomFood: shouldSaveCustomFood,
                 logDate: logDate,
                 quantityMode: quantityMode,
                 quantityAmount: quantityAmount
@@ -92,7 +111,6 @@ struct LogEntryRepository {
     private func makeLogEntry(
         draft: FoodDraft,
         storedFood: FoodItem?,
-        shouldSaveCustomFood: Bool,
         logDate: Date,
         quantityMode: QuantityMode,
         quantityAmount: Double
@@ -103,7 +121,7 @@ struct LogEntryRepository {
             dateLogged: logDate,
             foodName: storedFood?.name ?? draft.name,
             brand: storedFood?.brand ?? draft.brandOrNil,
-            source: storedFood?.sourceKind ?? (shouldSaveCustomFood ? .custom : draft.source),
+            source: storedFood?.sourceKind ?? draft.source,
             servingDescription: storedFood?.servingDescription ?? draft.servingDescription,
             gramsPerServing: storedFood?.gramsPerServing ?? draft.gramsPerServing,
             caloriesPerServing: storedFood?.caloriesPerServing ?? draft.caloriesPerServing,

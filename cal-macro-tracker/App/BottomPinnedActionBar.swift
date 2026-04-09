@@ -7,26 +7,43 @@ struct BottomPinnedActionBar: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                if let systemImage {
-                    Image(systemName: systemImage)
-                        .font(.headline)
-                }
-
-                Text(title)
-                    .font(.headline.weight(.semibold))
+        if #available(iOS 26, macOS 26, *) {
+            Button(action: action) {
+                labelContent
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(isDisabled ? Color.secondary.opacity(0.5) : Color.black)
-            .clipShape(Capsule())
+            .buttonStyle(.glassProminent)
             .padding(.horizontal, 20)
             .padding(.top, 10)
             .padding(.bottom, 8)
-            .background(.ultraThinMaterial)
+            .disabled(isDisabled)
+        } else {
+            Button(action: action) {
+                labelContent
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(isDisabled ? Color.secondary.opacity(0.5) : Color.black)
+                    .clipShape(Capsule())
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
+                    .background(.ultraThinMaterial)
+            }
+            .disabled(isDisabled)
         }
-        .disabled(isDisabled)
+    }
+
+    private var labelContent: some View {
+        HStack(spacing: 12) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.headline)
+            }
+
+            Text(title)
+                .font(.headline.weight(.semibold))
+        }
     }
 }
