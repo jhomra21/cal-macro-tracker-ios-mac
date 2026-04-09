@@ -2,7 +2,6 @@ import Foundation
 
 struct USDAProxyFood: Decodable, Identifiable, Hashable {
     let id: String
-    let fdcId: Int
     let name: String
     let brand: String?
     let servingDescription: String

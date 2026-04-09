@@ -1,9 +1,5 @@
 project: cal-macro-tracker.xcodeproj
 schemes:
   - cal-macro-tracker
-targets:
-  - cal-macro-tracker
-format: xcode
 retain_public: true
 clean_build: true
-skip_build: false

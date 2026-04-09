@@ -6,6 +6,7 @@ enum AppModelContainerFactory {
         try ModelContainer(for: DailyGoals.self, FoodItem.self, LogEntry.self)
     }
 
+    // periphery:ignore - preview-only container used by SwiftUI previews
     static func makePreviewContainer() throws -> ModelContainer {
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(

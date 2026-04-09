@@ -49,13 +49,6 @@ struct DailyGoalsDraft: Hashable {
 
     init() {}
 
-    init(goals: DailyGoals) {
-        calorieGoal = goals.calorieGoal
-        proteinGoalGrams = goals.proteinGoalGrams
-        fatGoalGrams = goals.fatGoalGrams
-        carbGoalGrams = goals.carbGoalGrams
-    }
-
     var isValid: Bool {
         validationError == nil
     }

@@ -54,10 +54,6 @@ enum RemoteSearchResult: Identifiable, Hashable {
         }
     }
 
-    var externalProductID: String? {
-        cacheLookupExternalProductIDs.first
-    }
-
     var cacheLookupExternalProductIDs: [String] {
         switch self {
         case let .openFoodFacts(product):

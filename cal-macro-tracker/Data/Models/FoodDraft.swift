@@ -124,11 +124,6 @@ struct FoodDraft: Identifiable, Hashable {
         return gramsPerServing > 0
     }
 
-    var hasRequiredFields: Bool {
-        let normalizedDraft = normalized()
-        return !normalizedDraft.name.isEmpty && !normalizedDraft.servingDescription.isEmpty
-    }
-
     var canSaveReusableFood: Bool {
         validationErrorForSaving() == nil
     }
@@ -253,10 +248,6 @@ struct FoodDraft: Identifiable, Hashable {
             fatPerServing: draft.fatPerServing,
             carbsPerServing: draft.carbsPerServing
         )
-    }
-
-    func makeCustomFoodItem() -> FoodItem {
-        makeReusableFoodItem(sourceOverride: .custom)
     }
 
     private static func trimmedText(from value: String) -> String? {

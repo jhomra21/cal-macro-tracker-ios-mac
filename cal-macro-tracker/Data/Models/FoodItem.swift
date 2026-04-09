@@ -63,11 +63,6 @@ final class FoodItem {
         FoodSource(rawValue: source) ?? .custom
     }
 
-    var canLogByGrams: Bool {
-        guard let gramsPerServing else { return false }
-        return gramsPerServing > 0
-    }
-
     var expectedSearchableText: String {
         FoodItem.makeSearchableText(name: name, brand: brand, barcode: barcode, aliases: [])
     }

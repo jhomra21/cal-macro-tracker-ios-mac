@@ -3,7 +3,6 @@ import Foundation
 struct PackagedFoodSearchPage {
     let query: String
     let page: Int
-    let pageSize: Int
     let provider: RemoteSearchProvider
     let results: [RemoteSearchResult]
     let hasMore: Bool
@@ -12,7 +11,6 @@ struct PackagedFoodSearchPage {
 private struct PackagedFoodSearchResponse: Decodable {
     let query: String
     let page: Int
-    let pageSize: Int
     let resolvedProvider: RemoteSearchProvider?
     let results: [PackagedFoodSearchResultDTO]
     let hasMore: Bool
@@ -26,7 +24,6 @@ private struct PackagedFoodSearchResponse: Decodable {
         return PackagedFoodSearchPage(
             query: query,
             page: page,
-            pageSize: pageSize,
             provider: provider,
             results: results.map(\.remoteSearchResult),
             hasMore: hasMore

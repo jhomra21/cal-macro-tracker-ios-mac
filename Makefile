@@ -17,7 +17,7 @@ format:
 	sh "$(QUALITY_DIR)/run_swift_format.sh" --config ".swift-format" --mode format --target "cal-macro-tracker"
 
 quality-dead:
-	sh "$(QUALITY_DIR)/run_periphery.sh" --config ".periphery.yml"
+	sh "$(QUALITY_DIR)/run_periphery.sh" --config ".periphery.yml" --destination "$(DESTINATION)"
 
 quality-dup:
 	sh "$(QUALITY_DIR)/duplicate_blocks.sh" --root "cal-macro-tracker" --min-lines 12

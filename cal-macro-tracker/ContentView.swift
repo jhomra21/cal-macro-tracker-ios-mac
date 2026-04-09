@@ -14,6 +14,7 @@ struct ContentView: View {
     }
 }
 
+// periphery:ignore - preview-only wrapper used by SwiftUI previews
 private struct ContentViewPreview: View {
     var body: some View {
         Group {

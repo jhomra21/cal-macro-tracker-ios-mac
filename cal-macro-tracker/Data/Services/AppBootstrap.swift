@@ -30,6 +30,7 @@ enum AppBootstrap {
         }
     }
 
+    // periphery:ignore - preview-only bootstrap used by in-memory SwiftUI previews
     static func bootstrapPreview(modelContext: ModelContext) throws {
         try CommonFoodSeedLoader.seedIfNeeded(modelContext: modelContext)
         try seedGoalsIfNeeded(modelContext: modelContext)

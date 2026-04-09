@@ -2,11 +2,16 @@
 set -eu
 
 config_path=""
+destination=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --config)
       config_path="$2"
+      shift 2
+      ;;
+    --destination)
+      destination="$2"
       shift 2
       ;;
     *)
@@ -32,4 +37,8 @@ if ! command -v periphery >/dev/null 2>&1; then
   exit 0
 fi
 
-periphery scan --config "$config_path"
+if [ -n "$destination" ]; then
+  periphery scan --config "$config_path" -- -destination "$destination"
+else
+  periphery scan --config "$config_path"
+fi
