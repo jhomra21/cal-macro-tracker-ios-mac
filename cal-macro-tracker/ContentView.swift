@@ -21,6 +21,7 @@ private struct ContentViewPreview: View {
             if let modelContainer = try? AppModelContainerFactory.makePreviewContainer() {
                 ContentView()
                     .modelContainer(modelContainer)
+                    .environment(AppDayContext())
             } else {
                 AppLaunchErrorView(message: "Unable to create preview model container.")
             }

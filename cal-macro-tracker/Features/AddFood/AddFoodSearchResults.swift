@@ -2,7 +2,6 @@ import SwiftData
 import SwiftUI
 
 struct SearchFoodListView: View {
-    let logDate: Date
     let foods: [FoodItem]
     let totalFoodsCount: Int
     let hasLoadedFoods: Bool
@@ -27,7 +26,6 @@ struct SearchFoodListView: View {
                     ForEach(foods) { food in
                         NavigationLink {
                             LogFoodScreen(
-                                logDate: logDate,
                                 initialDraft: FoodDraft(foodItem: food, saveAsCustomFood: false),
                                 onFoodLogged: onFoodLogged
                             )
@@ -81,7 +79,6 @@ struct SearchFoodListView: View {
                     ForEach(remoteResults) { result in
                         NavigationLink {
                             RemoteSearchSelectionScreen(
-                                logDate: logDate,
                                 result: result,
                                 onFoodLogged: onFoodLogged
                             )
@@ -167,7 +164,6 @@ private struct RemoteFoodRow: View {
 private struct RemoteSearchSelectionScreen: View {
     @Environment(\.modelContext) private var modelContext
 
-    let logDate: Date
     let result: RemoteSearchResult
     let onFoodLogged: () -> Void
 
@@ -178,7 +174,6 @@ private struct RemoteSearchSelectionScreen: View {
         Group {
             if let draft {
                 LogFoodScreen(
-                    logDate: logDate,
                     initialDraft: draft,
                     reviewNotes: result.reviewNotes,
                     onFoodLogged: onFoodLogged

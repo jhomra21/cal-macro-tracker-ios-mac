@@ -179,21 +179,34 @@ private struct GoalProgressRing: View {
         colorScheme == .dark ? trackColor.opacity(0.2) : trackColor.opacity(0.45)
     }
 
-    private var overflowHeadShadowColor: Color {
-        Color.black.opacity(colorScheme == .dark ? 0.8 : 0.5)
-    }
+    // Visual contract for this ring:
+    // - `progress <= 1`: one trimmed arc with a real `.round` cap and an angular gradient.
+    // - `progress > 1`: keep the first lap and the overlapping lap as separate layers.
+    //   The base lap stays a nearly full gradient ring, the overlapping tail is a flat
+    //   `endColor` stroke, and the visible head is a separate circular tip.
+    // This split is intentional. Converting the overlap case back into one closed circle
+    // or one extra highlighted arc removes the true rounded head and reintroduces seams,
+    // blobs, or a second visible mini-ring at the overlap point.
+    private func dynamicSingleLapGradient(fraction: Double) -> AngularGradient {
+        let span = max(fraction, 0.001) * 360.0
 
-    private var completedOverflowLapCount: Int {
-        max(Int(progress.rounded(.down)) - 1, 0)
-    }
+        let safeStartAngle: CGFloat = -15.0
+        let totalSpan = span + 30.0  // from -15 to span + 15
 
-    private var overflowRemainder: Double {
-        let remainder = progress.truncatingRemainder(dividingBy: 1.0)
-        return remainder == 0 ? 0 : remainder
-    }
+        let zeroLocation = abs(safeStartAngle) / totalSpan
+        let tipLocation = (span + abs(safeStartAngle)) / totalSpan
 
-    private var lapInset: CGFloat {
-        max(lineWidth * 0.18, 0.8)
+        return AngularGradient(
+            gradient: Gradient(stops: [
+                .init(color: gradientStartColor.color, location: 0.0),
+                .init(color: gradientStartColor.color, location: zeroLocation),
+                .init(color: gradientEndColor.color, location: tipLocation),
+                .init(color: gradientEndColor.color, location: 1.0)  // forward cap buffer
+            ]),
+            center: .center,
+            startAngle: .degrees(safeStartAngle),
+            endAngle: .degrees(span + 15)  // +15 ensures forward caps are fully covered
+        )
     }
 
     var body: some View {
@@ -202,104 +215,70 @@ private struct GoalProgressRing: View {
                 .stroke(resolvedTrackColor, lineWidth: lineWidth)
 
             if progress > 0 {
-                if progress <= 1.0 {
+                let remainder = progress.truncatingRemainder(dividingBy: 1.0)
+                let overlap = (remainder == 0 && progress >= 1.0) ? 1.0 : remainder
+                let hasFullLap = progress > 1.0
+
+                let startTrim: CGFloat = 0.0001
+                let safeOverlap = max(startTrim, overlap == 1.0 ? 0.999 : overlap)
+
+                if hasFullLap {
+                    // Keep the overlap renderer layer-split. The first lap remains the
+                    // continuous ring under everything else so the overlap still reads
+                    // as one ring instead of a second concentric or detached segment.
                     Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(dynamicSingleLapGradient(fraction: progress), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .trim(from: startTrim, to: 0.999)
+                        .stroke(
+                            dynamicSingleLapGradient(fraction: 1.0),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                        )
                         .rotationEffect(.degrees(-90))
+
+                    // Shadow is isolated to the overlap tip so depth appears only where
+                    // lap two passes over lap one, without muddying the active sweep.
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: lineWidth * 0.9, height: lineWidth * 0.9)
+                        .shadow(
+                            color: .black.opacity(colorScheme == .dark ? 0.8 : 0.45),
+                            radius: lineWidth * 0.25,
+                            x: -lineWidth * 0.15,
+                            y: 0
+                        )
+                        .offset(y: -diameter / 2)
+                        .rotationEffect(.degrees(overlap * 360))
+
+                    // The active overlap tail must stay `.butt` capped. A rounded start
+                    // cap at 12 o'clock bleeds backwards and exposes a false restart.
+                    Circle()
+                        .trim(from: startTrim, to: safeOverlap)
+                        .stroke(
+                            gradientEndColor.color,
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt)
+                        )
+                        .rotationEffect(.degrees(-90))
+
+                    // The visible rounded head is restored explicitly as a tip circle.
+                    // This is what keeps the overlap looking like one ring with one head.
+                    Circle()
+                        .fill(gradientEndColor.color)
+                        .frame(width: lineWidth, height: lineWidth)
+                        .offset(y: -diameter / 2)
+                        .rotationEffect(.degrees(overlap * 360))
+
                 } else {
+                    // Single lap
+                    let safeProgress = max(startTrim, progress == 1.0 ? 0.999 : progress)
                     Circle()
-                        .stroke(rotatedMultiLapGradient(activeProgress: 1.0), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                        .trim(from: startTrim, to: safeProgress)
+                        .stroke(
+                            dynamicSingleLapGradient(fraction: progress),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                        )
                         .rotationEffect(.degrees(-90))
-
-                    ForEach(0..<completedOverflowLapCount, id: \.self) { lapIndex in
-                        Circle()
-                            .stroke(
-                                rotatedMultiLapGradient(activeProgress: 1.0),
-                                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                            .frame(
-                                width: lapDiameter(forOverflowLapIndex: lapIndex + 1),
-                                height: lapDiameter(forOverflowLapIndex: lapIndex + 1)
-                            )
-                    }
-
-                    if overflowRemainder > 0 {
-                        let activeLapDiameter = lapDiameter(forOverflowLapIndex: completedOverflowLapCount + 1)
-                        let activeGradient = rotatedMultiLapGradient(activeProgress: overflowRemainder)
-
-                        overflowHead(
-                            diameter: activeLapDiameter,
-                            progress: overflowRemainder
-                        )
-
-                        Circle()
-                            .trim(from: 0, to: overflowRemainder)
-                            .stroke(activeGradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: activeLapDiameter, height: activeLapDiameter)
-                    } else {
-                        overflowHead(
-                            diameter: lapDiameter(forOverflowLapIndex: completedOverflowLapCount),
-                            progress: 1.0
-                        )
-                    }
                 }
             }
         }
         .frame(width: diameter, height: diameter)
-    }
-
-    private func lapDiameter(forOverflowLapIndex index: Int) -> CGFloat {
-        max(lineWidth, diameter - (CGFloat(index) * lapInset))
-    }
-
-    private func overflowHead(diameter: CGFloat, progress: Double) -> some View {
-        ZStack {
-            Circle()
-                .fill(Color.black)
-                .frame(width: lineWidth, height: lineWidth)
-                .offset(y: -diameter / 2)
-        }
-        .frame(width: diameter, height: diameter)
-        .rotationEffect(.degrees(progress * 360))
-        .shadow(color: overflowHeadShadowColor, radius: lineWidth * 0.5, x: 0, y: lineWidth * 0.05)
-    }
-
-    private func dynamicSingleLapGradient(fraction: Double) -> AngularGradient {
-        let head = min(max(fraction, 0.01), 0.98)
-        let headBuffer = min(head + 0.01, 0.99)
-        return AngularGradient(
-            gradient: Gradient(stops: [
-                .init(color: gradientStartColor.color, location: 0.0),
-                .init(color: gradientEndColor.color, location: head),
-                .init(color: gradientEndColor.color, location: headBuffer),
-                // Instantly drops to strictly startColor to totally eliminate Start Cap vertical slices
-                .init(color: gradientStartColor.color, location: min(headBuffer + 0.01, 1.0)),
-                .init(color: gradientStartColor.color, location: 1.0)
-            ]),
-            center: .center,
-            startAngle: .degrees(0),
-            endAngle: .degrees(360)
-        )
-    }
-
-    private func rotatedMultiLapGradient(activeProgress: Double) -> AngularGradient {
-        // Compute to place the absolute brightest color map exactly under the physical sweeping tip!
-        let targetAngle = activeProgress * 360.0
-        let currentAngleOfBrightest = 0.90 * 360.0
-        let shift = targetAngle - currentAngleOfBrightest
-
-        return AngularGradient(
-            gradient: Gradient(stops: [
-                .init(color: gradientStartColor.color, location: 0.0),
-                .init(color: gradientEndColor.color, location: 0.90),
-                .init(color: gradientStartColor.color, location: 1.0)
-            ]),
-            center: .center,
-            startAngle: .degrees(shift),
-            endAngle: .degrees(shift + 360)
-        )
     }
 }

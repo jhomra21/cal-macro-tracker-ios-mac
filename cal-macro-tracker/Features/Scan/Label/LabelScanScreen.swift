@@ -3,7 +3,6 @@ import PhotosUI
 import SwiftUI
 
 struct LabelScanScreen: View {
-    let logDate: Date
     let onFoodLogged: () -> Void
 
     @State private var selectedPhoto: PhotosPickerItem?
@@ -20,7 +19,6 @@ struct LabelScanScreen: View {
         Group {
             if let draft {
                 LogFoodScreen(
-                    logDate: logDate,
                     initialDraft: draft,
                     reviewNotes: notes,
                     previewImageData: previewImageData,
@@ -101,7 +99,6 @@ struct LabelScanScreen: View {
 import SwiftUI
 
 struct LabelScanScreen: View {
-    let logDate: Date
     let onFoodLogged: () -> Void
 
     var body: some View {

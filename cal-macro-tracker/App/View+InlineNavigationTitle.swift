@@ -9,13 +9,4 @@ extension View {
         self
         #endif
     }
-
-    @ViewBuilder
-    func largeNavigationTitle() -> some View {
-        #if os(iOS)
-        navigationBarTitleDisplayMode(.large)
-        #else
-        self
-        #endif
-    }
 }

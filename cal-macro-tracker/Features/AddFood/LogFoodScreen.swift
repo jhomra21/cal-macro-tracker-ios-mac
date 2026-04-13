@@ -7,7 +7,6 @@ import UIKit
 struct LogFoodScreen: View {
     @Environment(\.modelContext) private var modelContext
 
-    let logDate: Date
     let initialDraft: FoodDraft
     let reviewNotes: [String]
     let previewImageData: Data?
@@ -25,13 +24,11 @@ struct LogFoodScreen: View {
     @FocusState private var focusedField: FoodDraftField?
 
     init(
-        logDate: Date,
         initialDraft: FoodDraft,
         reviewNotes: [String] = [],
         previewImageData: Data? = nil,
         onFoodLogged: @escaping () -> Void = {}
     ) {
-        self.logDate = logDate
         self.initialDraft = initialDraft
         self.reviewNotes = reviewNotes
         self.previewImageData = previewImageData
@@ -224,7 +221,6 @@ struct LogFoodScreen: View {
             try logEntryRepository.logFood(
                 draft: finalizedDraft,
                 reusableFoodPersistenceMode: reusableFoodPersistenceMode,
-                logDate: logDate,
                 quantityMode: quantityMode,
                 quantityAmount: activeAmount,
                 operation: "Log food"

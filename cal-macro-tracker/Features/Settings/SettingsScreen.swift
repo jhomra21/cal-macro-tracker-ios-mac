@@ -3,11 +3,12 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @Query private var goals: [DailyGoals]
+    @FocusState private var focusedField: DailyGoalsField?
 
     var body: some View {
-        List {
+        Form {
             if let goals = goals.first {
-                SettingsGoalsEditorSection(goals: goals)
+                SettingsGoalsEditorSection(goals: goals, focusedField: $focusedField)
             }
 
             SavedFoodsSection(
@@ -22,6 +23,7 @@ struct SettingsScreen: View {
             )
         }
         .scrollDismissesKeyboard(.interactively)
+        .keyboardNavigationToolbar(focusedField: $focusedField, fields: DailyGoalsField.formOrder)
         .navigationTitle("Settings")
     }
 

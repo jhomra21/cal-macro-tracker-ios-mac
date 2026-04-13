@@ -9,9 +9,8 @@ struct LogEntryDaySnapshot {
 }
 
 enum LogEntryDaySummary {
-    static func descriptor(for date: Date) -> FetchDescriptor<LogEntry> {
-        let interval = date.dayInterval
-        return descriptor(start: interval.start, end: interval.end)
+    static func descriptor(for day: CalendarDay) -> FetchDescriptor<LogEntry> {
+        descriptor(start: day.dayInterval.start, end: day.dayInterval.end)
     }
 
     static func descriptor(start: Date, end: Date) -> FetchDescriptor<LogEntry> {
@@ -29,13 +28,13 @@ enum LogEntryDaySummary {
         LogEntryDaySnapshot(entries: entries, totals: NutritionMath.totals(for: entries))
     }
 
-    static func snapshotsByDay(for entries: [LogEntry], matching dates: [Date]) -> [Date: LogEntryDaySnapshot] {
+    static func snapshotsByDay(for entries: [LogEntry], matching days: [CalendarDay]) -> [CalendarDay: LogEntryDaySnapshot] {
         let entriesByDay = Dictionary(grouping: entries) { entry in
-            entry.dateLogged.startOfDayValue
+            entry.dateLogged.calendarDay
         }
 
-        return dates.reduce(into: [Date: LogEntryDaySnapshot]()) { snapshots, date in
-            snapshots[date] = snapshot(for: entriesByDay[date] ?? [])
+        return days.reduce(into: [CalendarDay: LogEntryDaySnapshot]()) { snapshots, day in
+            snapshots[day] = snapshot(for: entriesByDay[day] ?? [])
         }
     }
 }

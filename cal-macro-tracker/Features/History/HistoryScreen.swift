@@ -2,9 +2,11 @@ import SwiftData
 import SwiftUI
 
 struct HistoryScreen: View {
+    @Environment(AppDayContext.self) private var dayContext
     @Query private var goals: [DailyGoals]
 
-    @State private var selectedDate = Date().startOfDayValue
+    @State private var selectedDay = CalendarDay(date: .now)
+    @State private var followsCurrentDay = true
     @State private var showsCalendar = false
 
     private var currentGoals: DailyGoals {
@@ -14,13 +16,17 @@ struct HistoryScreen: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                HistoryWeekCard(selectedDate: $selectedDate, showsCalendar: $showsCalendar, goals: currentGoals)
+                HistoryWeekCard(
+                    selectedDay: selectedDayBinding,
+                    showsCalendar: $showsCalendar,
+                    goals: currentGoals
+                )
 
-                LogEntryDaySnapshotReader(date: selectedDate) { snapshot in
+                LogEntryDaySnapshotReader(day: selectedDay) { snapshot in
                     CompactMacroSummaryView(totals: snapshot.totals, goals: currentGoals, horizontalPadding: 0)
 
                     LogEntryListSection(
-                        title: selectedDate.dayTitle,
+                        title: selectedDay.dayTitle,
                         emptyTitle: "Nothing logged",
                         emptySystemImage: "calendar.badge.exclamationmark",
                         emptyDescription: "No entries were saved for this date.",
@@ -34,8 +40,19 @@ struct HistoryScreen: View {
             .padding(.bottom, 40)
         }
         .background(PlatformColors.groupedBackground)
-        .navigationTitle(selectedDate.historyNavigationTitle)
+        .navigationTitle(selectedDay.historyNavigationTitle)
         .inlineNavigationTitle()
+        .onAppear {
+            guard followsCurrentDay else { return }
+            selectedDay = dayContext.today
+        }
+        .onChange(of: dayContext.today) { oldToday, newToday in
+            if followsCurrentDay {
+                selectedDay = newToday
+            } else if selectedDay == oldToday {
+                selectedDay = newToday
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .appTopBarTrailing) {
                 calendarToolbarButton
@@ -49,6 +66,18 @@ struct HistoryScreen: View {
         }
     }
 
+    private var selectedDayBinding: Binding<CalendarDay> {
+        Binding(
+            get: { selectedDay },
+            set: { updateSelectedDay($0) }
+        )
+    }
+
+    private func updateSelectedDay(_ newDay: CalendarDay) {
+        selectedDay = newDay
+        followsCurrentDay = newDay == dayContext.today
+    }
+
     private var calendarToolbarButton: some View {
         Button(action: toggleCalendar) {
             Image(systemName: "calendar")
@@ -58,7 +87,7 @@ struct HistoryScreen: View {
 }
 
 private struct HistoryWeekCard: View {
-    @Binding var selectedDate: Date
+    @Binding var selectedDay: CalendarDay
     @Binding var showsCalendar: Bool
     let goals: DailyGoals
 
@@ -82,7 +111,7 @@ private struct HistoryWeekCard: View {
 
     private var content: some View {
         VStack(spacing: 0) {
-            HistoryWeekStrip(selectedDate: $selectedDate, goals: goals)
+            HistoryWeekStrip(selectedDay: $selectedDay, goals: goals)
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
                 .padding(.bottom, 12)
@@ -100,7 +129,7 @@ private struct HistoryWeekCard: View {
     }
 
     private var calendarSection: some View {
-        HistoryCalendarView(selection: $selectedDate)
+        HistoryCalendarView(selection: $selectedDay)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -109,42 +138,46 @@ private struct HistoryWeekCard: View {
 }
 
 private struct HistoryWeekStrip: View {
-    @Binding var selectedDate: Date
+    @Binding var selectedDay: CalendarDay
     let goals: DailyGoals
 
     @Query private var entries: [LogEntry]
 
-    init(selectedDate: Binding<Date>, goals: DailyGoals) {
-        _selectedDate = selectedDate
+    init(selectedDay: Binding<CalendarDay>, goals: DailyGoals) {
+        _selectedDay = selectedDay
         self.goals = goals
 
-        let normalizedSelection = selectedDate.wrappedValue.startOfDayValue
-        let weekDates = normalizedSelection.weekDates
-        let weekStart = weekDates.first ?? normalizedSelection
-        let weekEnd = Calendar.current.date(byAdding: .day, value: 1, to: weekDates.last ?? normalizedSelection) ?? normalizedSelection
+        let weekDays = selectedDay.wrappedValue.weekDays
+        let weekStart = weekDays.first?.startDate ?? selectedDay.wrappedValue.startDate
+        let weekEnd =
+            Calendar.current.date(
+                byAdding: .day,
+                value: 1,
+                to: weekDays.last?.startDate ?? selectedDay.wrappedValue.startDate
+            ) ?? selectedDay.wrappedValue.startDate
         _entries = Query(LogEntryDaySummary.descriptor(start: weekStart, end: weekEnd))
     }
 
-    private var weekDates: [Date] {
-        selectedDate.weekDates
+    private var weekDays: [CalendarDay] {
+        selectedDay.weekDays
     }
 
-    private var snapshotsByDay: [Date: LogEntryDaySnapshot] {
-        LogEntryDaySummary.snapshotsByDay(for: entries, matching: weekDates)
+    private var snapshotsByDay: [CalendarDay: LogEntryDaySnapshot] {
+        LogEntryDaySummary.snapshotsByDay(for: entries, matching: weekDays)
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            ForEach(weekDates, id: \.self) { date in
+            ForEach(weekDays, id: \.self) { day in
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) {
-                        selectedDate = date
+                        selectedDay = day
                     }
                 } label: {
                     HistoryWeekdayCell(
-                        date: date,
-                        isSelected: date == selectedDate,
-                        snapshot: snapshotsByDay[date] ?? .empty,
+                        day: day,
+                        isSelected: day == selectedDay,
+                        snapshot: snapshotsByDay[day] ?? .empty,
                         goals: goals
                     )
                 }
@@ -156,14 +189,14 @@ private struct HistoryWeekStrip: View {
 }
 
 private struct HistoryWeekdayCell: View {
-    let date: Date
+    let day: CalendarDay
     let isSelected: Bool
     let snapshot: LogEntryDaySnapshot
     let goals: DailyGoals
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(date.weekdayNarrowTitle)
+            Text(day.weekdayNarrowTitle)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(width: 32, height: 32)
@@ -179,7 +212,7 @@ private struct HistoryWeekdayCell: View {
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(date.weekdayAccessibilityTitle))
+        .accessibilityLabel(Text(day.weekdayAccessibilityTitle))
         .accessibilityValue(Text("\(snapshot.entries.count) logged items"))
     }
 }

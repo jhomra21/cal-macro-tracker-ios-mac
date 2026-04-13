@@ -1,11 +1,21 @@
 import SwiftData
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
-private enum DailyGoalsField: Hashable {
+enum DailyGoalsField: Hashable {
     case calories
     case protein
     case fat
     case carbs
+
+    static let formOrder: [DailyGoalsField] = [
+        .calories,
+        .protein,
+        .fat,
+        .carbs
+    ]
 }
 
 private struct DailyGoalsNumericText: Equatable {
@@ -49,11 +59,6 @@ private struct DailyGoalsNumericText: Equatable {
 private struct DailyGoalsSection: View {
     @Binding var numericText: DailyGoalsNumericText
     let focusedField: FocusState<DailyGoalsField?>.Binding
-    let actionTitle: String
-    let actionSystemImage: String?
-    let actionColor: Color
-    let canSave: Bool
-    let onSave: () -> Void
 
     var body: some View {
         Section("Daily Goals") {
@@ -85,7 +90,19 @@ private struct DailyGoalsSection: View {
                 focusedField: focusedField,
                 field: .carbs
             )
+        }
+    }
+}
 
+private struct DailyGoalsSaveSection: View {
+    let actionTitle: String
+    let actionSystemImage: String?
+    let actionColor: Color
+    let canSave: Bool
+    let onSave: () -> Void
+
+    var body: some View {
+        Section {
             Button(action: onSave) {
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
@@ -99,11 +116,9 @@ private struct DailyGoalsSection: View {
 
                     Spacer(minLength: 0)
                 }
-                .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .foregroundStyle(actionColor)
             }
-            .buttonStyle(.plain)
             .allowsHitTesting(canSave)
             .opacity(canSave || actionSystemImage != nil ? 1 : 0.55)
         }
@@ -120,13 +135,14 @@ struct SettingsGoalsEditorSection: View {
     @State private var didJustSave = false
     @State private var errorMessage: String?
     @State private var saveFeedbackToken = 0
-    @FocusState private var focusedField: DailyGoalsField?
+    let focusedField: FocusState<DailyGoalsField?>.Binding
 
-    init(goals: DailyGoals) {
+    init(goals: DailyGoals, focusedField: FocusState<DailyGoalsField?>.Binding) {
         self.goals = goals
         let initialText = DailyGoalsNumericText(goals: goals)
         _numericText = State(initialValue: initialText)
         _baselineText = State(initialValue: initialText)
+        self.focusedField = focusedField
     }
 
     private var goalsRepository: DailyGoalsRepository {
@@ -158,23 +174,18 @@ struct SettingsGoalsEditorSection: View {
     }
 
     var body: some View {
-        DailyGoalsSection(
-            numericText: $numericText,
-            focusedField: $focusedField,
-            actionTitle: actionTitle,
-            actionSystemImage: actionSystemImage,
-            actionColor: actionColor,
-            canSave: canSave,
-            onSave: saveGoals
-        )
-        .toolbar {
-            ToolbarItem(placement: .appTopBarTrailing) {
-                if focusedField != nil {
-                    Button("Done") {
-                        focusedField = nil
-                    }
-                }
-            }
+        Group {
+            DailyGoalsSection(
+                numericText: $numericText,
+                focusedField: focusedField
+            )
+            DailyGoalsSaveSection(
+                actionTitle: actionTitle,
+                actionSystemImage: actionSystemImage,
+                actionColor: actionColor,
+                canSave: canSave,
+                onSave: saveGoals
+            )
         }
         .errorBanner(message: $errorMessage)
         .sensoryFeedback(.success, trigger: saveFeedbackToken)
@@ -185,7 +196,7 @@ struct SettingsGoalsEditorSection: View {
             }
         }
         .onDisappear {
-            focusedField = nil
+            focusedField.wrappedValue = nil
         }
     }
 
@@ -195,8 +206,14 @@ struct SettingsGoalsEditorSection: View {
             return
         }
 
-        focusedField = nil
+        dismissEditing()
 
+        DispatchQueue.main.async {
+            persistGoals(finalizedDraft)
+        }
+    }
+
+    private func persistGoals(_ finalizedDraft: DailyGoalsDraft) {
         do {
             try goalsRepository.saveGoals(from: finalizedDraft, to: goals, operation: "Save goals")
             baselineText = numericText
@@ -207,5 +224,12 @@ struct SettingsGoalsEditorSection: View {
             errorMessage = error.localizedDescription
             assertionFailure(error.localizedDescription)
         }
+    }
+
+    private func dismissEditing() {
+        focusedField.wrappedValue = nil
+        #if os(iOS)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
     }
 }

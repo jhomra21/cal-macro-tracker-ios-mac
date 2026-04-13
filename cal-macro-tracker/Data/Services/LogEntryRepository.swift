@@ -41,7 +41,7 @@ struct LogEntryRepository {
         }
     }
 
-    func logAgain(entry: LogEntry, logDate: Date, operation: String) throws {
+    func logAgain(entry: LogEntry, loggedAt: Date = .now, operation: String) throws {
         let draft = FoodDraft(logEntry: entry, saveAsCustomFood: false)
         let quantityMode = entry.quantityModeKind
         let quantityAmount = quantityMode == .servings ? (entry.servingsConsumed ?? 0) : (entry.gramsConsumed ?? 0)
@@ -49,7 +49,7 @@ struct LogEntryRepository {
         try logFood(
             draft: draft,
             reusableFoodPersistenceMode: .none,
-            logDate: logDate,
+            loggedAt: loggedAt,
             quantityMode: quantityMode,
             quantityAmount: quantityAmount,
             operation: operation
@@ -59,7 +59,7 @@ struct LogEntryRepository {
     func logFood(
         draft: FoodDraft,
         reusableFoodPersistenceMode: ReusableFoodPersistenceMode,
-        logDate: Date,
+        loggedAt: Date = .now,
         quantityMode: QuantityMode,
         quantityAmount: Double,
         operation: String
@@ -78,7 +78,7 @@ struct LogEntryRepository {
             let entry = makeLogEntry(
                 draft: normalizedDraft,
                 storedFood: storedFood,
-                logDate: logDate,
+                loggedAt: loggedAt,
                 quantityMode: quantityMode,
                 quantityAmount: quantityAmount
             )
@@ -111,14 +111,14 @@ struct LogEntryRepository {
     private func makeLogEntry(
         draft: FoodDraft,
         storedFood: FoodItem?,
-        logDate: Date,
+        loggedAt: Date,
         quantityMode: QuantityMode,
         quantityAmount: Double
     ) -> LogEntry {
         let consumedNutrition = NutritionMath.consumedNutrition(for: draft, mode: quantityMode, amount: quantityAmount)
 
         return LogEntry(
-            dateLogged: logDate,
+            dateLogged: loggedAt,
             foodName: storedFood?.name ?? draft.name,
             brand: storedFood?.brand ?? draft.brandOrNil,
             source: storedFood?.sourceKind ?? draft.source,

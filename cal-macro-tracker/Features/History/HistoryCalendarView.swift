@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HistoryCalendarView: View {
-    @Binding var selection: Date
+    @Binding var selection: CalendarDay
 
     var body: some View {
         DatePicker(
@@ -16,10 +16,10 @@ struct HistoryCalendarView: View {
     private var normalizedSelection: Binding<Date> {
         Binding(
             get: {
-                selection.startOfDayValue
+                selection.startDate
             },
             set: { newValue in
-                selection = newValue.startOfDayValue
+                selection = CalendarDay(date: newValue)
             }
         )
     }

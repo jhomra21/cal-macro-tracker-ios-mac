@@ -83,7 +83,6 @@ struct FoodDraftFormSections: View {
     let brandPrompt: String
     let gramsPrompt: String
     let focusedField: FocusState<FoodDraftField?>.Binding
-
     @Binding private var numericText: FoodDraftNumericText
 
     init(
@@ -109,9 +108,12 @@ struct FoodDraftFormSections: View {
                     .focused(focusedField, equals: .brand)
                 TextField("Serving description", text: $draft.servingDescription)
                     .focused(focusedField, equals: .servingDescription)
-                TextField(gramsPrompt, text: numericBinding(\.gramsPerServing))
-                    .focused(focusedField, equals: .gramsPerServing)
-                    .numericKeyboard()
+                AppNumericTextField(
+                    gramsPrompt,
+                    text: numericBinding(\.gramsPerServing),
+                    focusedField: focusedField,
+                    field: .gramsPerServing
+                )
             }
 
             Section("Nutrition per serving") {

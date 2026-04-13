@@ -82,9 +82,12 @@ struct EditLogEntryScreen: View {
                         .foregroundStyle(.secondary)
                 }
 
-                TextField(quantityMode == .servings ? "Servings eaten" : "Grams eaten", text: $quantityAmountText)
-                    .focused($focusedField, equals: .quantityAmount)
-                    .numericKeyboard()
+                AppNumericTextField(
+                    quantityMode == .servings ? "Servings eaten" : "Grams eaten",
+                    text: $quantityAmountText,
+                    focusedField: $focusedField,
+                    field: .quantityAmount
+                )
             }
         } footerSections: {
             Section {

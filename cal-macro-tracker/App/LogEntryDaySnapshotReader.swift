@@ -6,8 +6,8 @@ struct LogEntryDaySnapshotReader<Content: View>: View {
 
     private let content: (LogEntryDaySnapshot) -> Content
 
-    init(date: Date, @ViewBuilder content: @escaping (LogEntryDaySnapshot) -> Content) {
-        _entries = Query(LogEntryDaySummary.descriptor(for: date))
+    init(day: CalendarDay, @ViewBuilder content: @escaping (LogEntryDaySnapshot) -> Content) {
+        _entries = Query(LogEntryDaySummary.descriptor(for: day))
         self.content = content
     }
 

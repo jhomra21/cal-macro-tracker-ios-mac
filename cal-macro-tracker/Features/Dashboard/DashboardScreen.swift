@@ -2,19 +2,17 @@ import SwiftData
 import SwiftUI
 
 struct DashboardScreen: View {
-    private enum Destination: Hashable {
-        case history
-        case settings
-    }
-
+    @Environment(AppDayContext.self) private var dayContext
     @Environment(\.modelContext) private var modelContext
+
+    let onOpenHistory: () -> Void
+    let onOpenSettings: () -> Void
 
     @Query(sort: \FoodItem.name) private var foods: [FoodItem]
     @Query private var goals: [DailyGoals]
 
     @State private var showingAddFood = false
     @State private var editingEntry: LogEntry?
-    @State private var destination: Destination?
     @State private var errorMessage: String?
     @State private var showsCompactSummary = false
 
@@ -22,12 +20,8 @@ struct DashboardScreen: View {
         goals.first ?? DailyGoals()
     }
 
-    private var showsBottomActionBar: Bool {
-        destination == nil
-    }
-
     var body: some View {
-        LogEntryDaySnapshotReader(date: .now) { snapshot in
+        LogEntryDaySnapshotReader(day: dayContext.today) { snapshot in
             ZStack(alignment: .top) {
                 List {
                     HStack {
@@ -69,47 +63,39 @@ struct DashboardScreen: View {
 
                 if showsCompactSummary {
                     CompactMacroSummaryView(totals: snapshot.totals, goals: currentGoals)
+                        .padding(.top, 8)
                         .allowsHitTesting(false)
                         .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
                 }
             }
-            .navigationTitle(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-            .largeNavigationTitle()
-            .dashboardNavigationBackground(showsCompactSummary: showsCompactSummary)
+            .navigationTitle(dayContext.today.historyNavigationTitle)
+            .inlineNavigationTitle()
             .animation(.easeInOut(duration: 0.2), value: showsCompactSummary)
             .toolbar {
-                ToolbarItemGroup(placement: .appTopBarTrailing) {
-                    Button {
-                        destination = .history
-                    } label: {
+                ToolbarItem(placement: .appTopBarTrailing) {
+                    Button(action: onOpenHistory) {
                         Image(systemName: "calendar")
+                            .font(.title3.weight(.semibold))
                     }
+                    .accessibilityLabel("Open history")
+                }
 
-                    Button {
-                        destination = .settings
-                    } label: {
+                ToolbarItem(placement: .appTopBarTrailing) {
+                    Button(action: onOpenSettings) {
                         Image(systemName: "gearshape")
+                            .font(.title3.weight(.semibold))
                     }
+                    .accessibilityLabel("Open settings")
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if showsBottomActionBar {
-                    BottomPinnedActionBar(title: "Add Food", systemImage: "plus", isDisabled: false) {
-                        showingAddFood = true
-                    }
-                }
-            }
-            .navigationDestination(item: $destination) { destination in
-                switch destination {
-                case .history:
-                    HistoryScreen()
-                case .settings:
-                    SettingsScreen()
+                BottomPinnedActionBar(title: "Add Food", systemImage: "plus", isDisabled: false) {
+                    showingAddFood = true
                 }
             }
             .sheet(isPresented: $showingAddFood) {
                 NavigationStack {
-                    AddFoodScreen(logDate: .now, foods: foods)
+                    AddFoodScreen(foods: foods)
                 }
             }
             .sheet(item: $editingEntry) { entry in
@@ -140,8 +126,7 @@ struct DashboardScreen: View {
 
     private func logEntryAgain(_ entry: LogEntry) {
         do {
-            try logEntryRepository.logAgain(
-                entry: entry, logDate: .now, operation: "Log food again")
+            try logEntryRepository.logAgain(entry: entry, operation: "Log food again")
         } catch {
             errorMessage = error.localizedDescription
             assertionFailure(error.localizedDescription)
@@ -188,17 +173,6 @@ private struct MacroLegendView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(16)
-    }
-}
-
-extension View {
-    @ViewBuilder
-    fileprivate func dashboardNavigationBackground(showsCompactSummary: Bool) -> some View {
-        #if os(iOS)
-        toolbarBackground(showsCompactSummary ? .hidden : .visible, for: .navigationBar)
-        #else
-        self
-        #endif
     }
 }
 

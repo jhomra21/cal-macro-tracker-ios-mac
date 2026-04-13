@@ -26,6 +26,46 @@
 - Cause: the custom `UICalendarView` bridge introduced a UIKit/SwiftUI teardown problem after selection.
 - Fix: removed the bridge from `HistoryCalendarView.swift` and used SwiftUI's graphical `DatePicker` on iOS with normalized start-of-day binding.
 
+### Navigation regression: custom History header
+
+#### What went wrong
+
+- We hid the native navigation bar on pushed `HistoryScreen` and replaced it with a custom overlay header.
+- That removed SwiftUI's native back-button and back-swipe behavior from the screen that actually needed to pop.
+- We then chased the regression with manual fixes that were wrong for this stack setup:
+  - custom close callbacks from History back into parent state
+  - explicit `dismiss()` coordination
+  - a UIKit bridge that manually re-enabled `interactivePopGestureRecognizer` and cleared its delegate
+- Those attempts were band-aids. They added complexity without restoring the supported navigation behavior.
+
+#### Root cause
+
+- In this codebase, `HistoryScreen` is a pushed SwiftUI destination inside `NavigationStack`.
+- The pushed screen must keep supported SwiftUI navigation semantics if we want reliable native back behavior.
+- Hiding the nav bar on that pushed screen and trying to recreate navigation manually broke that contract.
+- The real bug was not the calendar view itself, nor root path ownership, but replacing native pushed-screen navigation with a custom header and UIKit gesture hack.
+
+#### Incorrect approach
+
+- Hiding the nav bar on `HistoryScreen` with `.toolbar(.hidden, for: .navigationBar)`.
+- Replacing the pushed screen's back affordance with `AppTopHeader`.
+- Mutating `interactivePopGestureRecognizer.delegate = nil` from a custom `UIViewControllerRepresentable`.
+- Treating parent callbacks or manual dismiss calls as a substitute for native pushed-screen navigation.
+
+#### Correct approach
+
+- Keep native navigation behavior on pushed `HistoryScreen`.
+- Use `.navigationTitle(selectedDate.historyNavigationTitle)` and `.inlineNavigationTitle()`.
+- Keep the calendar action as a normal toolbar item.
+- Reserve custom headers for places where we are not replacing the pushed screen's native back/pop contract, or where we fully own the navigation shell in a supported way.
+
+#### What actually fixed it
+
+- Restored native navigation chrome on `HistoryScreen`.
+- Removed the hidden-nav-bar setup from History.
+- Removed the custom interactive-pop UIKit bridge entirely.
+- Kept the content-spacing fix separately, since the top-offset issue was real but unrelated to the back-navigation failure.
+
 ## Scan Flows
 
 ### Delivered
@@ -162,6 +202,39 @@
 - Added `TrailingCaretNumericTextField.swift` as a small `UIViewRepresentable` escape hatch for iOS numeric entry.
 - Updated `DailyGoalsSection.swift` so the full save row acts as the button target.
 
+### Follow-up: inline Settings editor with shared keyboard flow
+
+#### What went wrong
+
+- We repeatedly tried to fix the Settings numeric-field focus bug locally while leaving the screen on a mixed `List`-based container.
+- That was the wrong level of abstraction for this codebase:
+  - the food-editing flows already used one shared pattern built around `Form`, shared focus state, and `keyboardNavigationToolbar`
+  - Settings kept being treated as a browse list with an inline editor bolted into it
+- A separate `DailyGoals` editor screen briefly normalized the architecture, but it added an extra tap and was rejected on product UX grounds.
+
+#### Root cause
+
+- The real mismatch was not just the numeric field implementation.
+- In this app, the working editing surfaces (`ManualFoodEntryScreen`, `FoodDraftEditorForm`, `LogFoodScreen`, `ReusableFoodEditorScreen`, and `EditLogEntryScreen`) all run inside a `Form` and attach the shared `keyboardNavigationToolbar`.
+- Settings was the outlier: inline numeric editing lived inside `SettingsScreen` while the container stayed a `List`, so the screen did not behave like the rest of the app's editing surfaces.
+- The first edit in Daily Goals also changed save-state UI, so keeping the editor inside the wrong container made the focus bug easy to re-trigger.
+
+#### Correct approach
+
+- Keep `Daily Goals` inline on the main Settings screen for fast access.
+- Reuse the same shared keyboard-toolbar path as the existing food editors instead of inventing a Settings-only toolbar or another screen-local focus system.
+- Move the Settings container itself onto `Form`, which is the Apple-documented SwiftUI container for grouped data entry and settings controls.
+- Keep browse/navigation content as sections within that same screen for now, but make the editing path use the same focus contract as the rest of the codebase.
+
+#### What actually fixed it
+
+- `SettingsScreen.swift` now uses `Form` instead of `List` while keeping `Daily Goals` inline.
+- `SettingsScreen.swift` owns the shared `@FocusState` for `DailyGoalsField`.
+- `SettingsScreen.swift` now attaches `.keyboardNavigationToolbar(focusedField: $focusedField, fields: DailyGoalsField.formOrder)`, reusing the existing shared keyboard accessory implementation.
+- `DailyGoalsSection.swift` now exposes `DailyGoalsField.formOrder` and consumes the shared focus binding passed from the container, instead of owning a separate screen-local focus path.
+- The save action remains in its own section, so the first edit no longer mutates the same input section structure while someone is actively typing.
+- This kept the UX inline, removed the extra navigation step, and reused existing shared keyboard behavior instead of duplicating it.
+
 ## Branding and App Configuration
 
 ### Delivered
@@ -206,3 +279,30 @@ The following planning documents have been fully consolidated into this file and
 - `scan-implementation-plan.md`
 - `food-search-implementation-plan.md`
 - `usda-proxy-implementation-plan.md`
+
+## Macro Ring Architecture Refinement
+
+### Delivered
+
+- Locked in the current macro-ring overlap rendering that the product now considers correct.
+- Preserved a single continuous-looking ring with one visible rounded head while a lap overlaps itself.
+- Avoided the regressions we hit during iteration: restart seams, detached balls, extra mini-rings, thick overlap bands, and headless full-circle overflow.
+
+### Main implementation steps
+
+- For `progress <= 1`, the ring is a single trimmed arc with a `.round` line cap and a controlled angular gradient from start color to end color.
+- For `progress > 1`, the renderer intentionally stops treating the ring as one closed stroke and instead composes four layers:
+  1. a nearly full first lap rendered as the base gradient ring
+  2. a tiny isolated shadow caster positioned at the active overlap point
+  3. a second-lap tail rendered as a solid `gradientEndColor` stroke with a `.butt` start cap
+  4. a separate circular tip at the active head to restore the rounded end cap visually
+- The tiny `startTrim` offset and `safeOverlap` clamp are part of the contract; they prevent visible restart slices and cap bleed at 12 o'clock.
+- `dynamicSingleLapGradient` is tuned so the physical origin stays pinned to the start color while the tip remains brightest at the actual head position.
+
+### Guidelines for Future Architecture Updates
+
+- **Do not collapse the overlap case back into one closed `Circle` stroke.** A closed circle has no real path end, so the rounded head disappears and future fixes tend to reintroduce fake blobs or secondary arcs.
+- **Do not add a separate highlight arc on top of the overlap.** That is what created the “extra little ring” / thickened segment regressions.
+- **Do not give the second-lap tail a `.round` start cap.** The backward cap shows up as a false restart at 12 o'clock.
+- **Keep the head as its own tip circle.** That separate tip is what preserves the same curved head feel the single-lap case already has.
+- **If this ever needs visual changes, preserve the contract first:** one continuous ring, one head, no visible restart line, no detached dot, no extra overlap band.

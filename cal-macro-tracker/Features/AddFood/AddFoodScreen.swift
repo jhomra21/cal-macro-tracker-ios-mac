@@ -3,7 +3,6 @@ import SwiftUI
 
 struct AddFoodScreen: View {
     @Environment(\.dismiss) private var dismiss
-    let logDate: Date
     let foods: [FoodItem]
     @State private var selectedMode: AddFoodMode = .search
     @State private var searchText = ""
@@ -34,8 +33,7 @@ struct AddFoodScreen: View {
     private let remotePageSize = 12
     private let packagedFoodSearchClient = PackagedFoodSearchClient()
 
-    init(logDate: Date, foods: [FoodItem]) {
-        self.logDate = logDate
+    init(foods: [FoodItem]) {
         self.foods = foods
     }
 
@@ -53,14 +51,13 @@ struct AddFoodScreen: View {
             .padding(.top, 12)
             VStack(alignment: .leading, spacing: 10) {
                 if selectedMode == .search {
-                    AddFoodQuickActions(logDate: logDate, onFoodLogged: closeSheet)
+                    AddFoodQuickActions(onFoodLogged: closeSheet)
                         .padding(.horizontal, 20)
                 }
                 Group {
                     switch selectedMode {
                     case .search:
                         SearchFoodListView(
-                            logDate: logDate,
                             foods: rankedFoods,
                             totalFoodsCount: searchableFoods.count,
                             hasLoadedFoods: !foods.isEmpty,
@@ -76,7 +73,7 @@ struct AddFoodScreen: View {
                             onLoadMoreRemoteResults: loadMoreRemoteResults
                         )
                     case .manual:
-                        ManualFoodEntryScreen(logDate: logDate, onFoodLogged: closeSheet)
+                        ManualFoodEntryScreen(onFoodLogged: closeSheet)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

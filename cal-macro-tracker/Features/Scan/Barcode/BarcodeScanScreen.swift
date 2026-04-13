@@ -28,12 +28,10 @@ struct BarcodeScanScreen: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    let logDate: Date
     let onFoodLogged: () -> Void
     let entryMode: EntryMode
 
-    init(logDate: Date, onFoodLogged: @escaping () -> Void, entryMode: EntryMode = .options) {
-        self.logDate = logDate
+    init(onFoodLogged: @escaping () -> Void, entryMode: EntryMode = .options) {
         self.onFoodLogged = onFoodLogged
         self.entryMode = entryMode
     }
@@ -54,43 +52,16 @@ struct BarcodeScanScreen: View {
     var body: some View {
         Group {
             if let draft {
-                LogFoodScreen(logDate: logDate, initialDraft: draft, onFoodLogged: onFoodLogged)
+                LogFoodScreen(initialDraft: draft, onFoodLogged: onFoodLogged)
             } else if shouldShowOptions {
-                List {
-                    Section("Scan Barcode") {
-                        if canScanLive {
-                            Button("Scan Live") {
-                                showingLiveScanner = true
-                            }
-                        } else {
-                            Text("Live barcode scanning is not available on this device right now.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                            Label("Choose Barcode Photo", systemImage: "photo")
-                        }
-
-                        if canUseCamera {
-                            Button("Take Barcode Photo") {
-                                showingCamera = true
-                            }
-                        }
-                    }
-
-                    if isLoading {
-                        Section {
-                            HStack {
-                                ProgressView()
-                                Text("Looking up product…")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .navigationTitle("Scan Barcode")
-                .inlineNavigationTitle()
+                BarcodeScanOptionsList(
+                    canScanLive: canScanLive,
+                    canUseCamera: canUseCamera,
+                    isLoading: isLoading,
+                    selectedPhoto: $selectedPhoto,
+                    onOpenLiveScanner: { showingLiveScanner = true },
+                    onOpenCamera: { showingCamera = true }
+                )
             } else {
                 ProgressView(isLoading ? "Looking up product…" : "Opening camera…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -280,25 +251,6 @@ struct BarcodeScanScreen: View {
         }
     }
 }
-
-private struct BarcodeLiveScannerSheet: View {
-    let onBarcodeScanned: (String) -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            BarcodeLiveScannerView(onBarcodeScanned: onBarcodeScanned)
-                .ignoresSafeArea()
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            onCancel()
-                        }
-                    }
-                }
-        }
-    }
-}
 #else
 import SwiftUI
 
@@ -308,12 +260,10 @@ struct BarcodeScanScreen: View {
         case immediateCamera
     }
 
-    let logDate: Date
     let onFoodLogged: () -> Void
     let entryMode: EntryMode
 
-    init(logDate: Date, onFoodLogged: @escaping () -> Void, entryMode: EntryMode = .options) {
-        self.logDate = logDate
+    init(onFoodLogged: @escaping () -> Void, entryMode: EntryMode = .options) {
         self.onFoodLogged = onFoodLogged
         self.entryMode = entryMode
     }
