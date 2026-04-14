@@ -165,17 +165,12 @@ struct BarcodeScanScreen: View {
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                throw NSError(
-                    domain: "BarcodeScanScreen", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load the selected image."])
-            }
+        defer { selectedPhoto = nil }
 
-            let image = try ScanImageLoading.loadUIImage(from: data)
-            selectedPhoto = nil
+        do {
+            let image = try await ScanImageLoading.loadUIImage(from: item)
             await scanSelectedImage(image, captureSource: .photoLibrary)
         } catch {
-            selectedPhoto = nil
             errorMessage = error.localizedDescription
         }
     }
@@ -195,21 +190,20 @@ struct BarcodeScanScreen: View {
     private func resolveBarcode(_ barcode: String, captureSource: BarcodeCaptureSource) async {
         do {
             isLoading = true
+            defer { isLoading = false }
+
             errorMessage = nil
             pendingRecoveryCaptureSource = nil
 
             if let cachedDraft = try cachedDraft(for: barcode) {
                 showManualOptions = true
                 logFoodDraft = cachedDraft
-                isLoading = false
                 return
             }
 
             showManualOptions = true
             logFoodDraft = try await resolveRemoteDraft(barcode: barcode)
-            isLoading = false
         } catch {
-            isLoading = false
             pendingRecoveryCaptureSource = shouldAutoRecoverCaptureFlow ? captureSource : nil
             errorMessage = "\(error.localizedDescription) \(captureSource.rescanPrompt)"
         }

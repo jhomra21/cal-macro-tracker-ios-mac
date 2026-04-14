@@ -9,21 +9,6 @@ struct LogEntryDaySnapshot {
 }
 
 enum LogEntryDaySummary {
-    static func descriptor(for day: CalendarDay) -> FetchDescriptor<LogEntry> {
-        descriptor(start: day.dayInterval.start, end: day.dayInterval.end)
-    }
-
-    static func descriptor(start: Date, end: Date) -> FetchDescriptor<LogEntry> {
-        let predicate = #Predicate<LogEntry> { entry in
-            entry.dateLogged >= start && entry.dateLogged < end
-        }
-
-        return FetchDescriptor(
-            predicate: predicate,
-            sortBy: [SortDescriptor(\LogEntry.dateLogged, order: .reverse)]
-        )
-    }
-
     static func snapshot(for entries: [LogEntry]) -> LogEntryDaySnapshot {
         LogEntryDaySnapshot(entries: entries, totals: NutritionSnapshot.totals(for: entries))
     }

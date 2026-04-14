@@ -306,3 +306,61 @@ The following planning documents have been fully consolidated into this file and
 - **Do not give the second-lap tail a `.round` start cap.** The backward cap shows up as a false restart at 12 o'clock.
 - **Keep the head as its own tip circle.** That separate tip is what preserves the same curved head feel the single-lap case already has.
 - **If this ever needs visual changes, preserve the contract first:** one continuous ring, one head, no visible restart line, no detached dot, no extra overlap band.
+
+## Daily Macro Widget, Home Screen Shortcuts, and App Entry
+
+### Delivered
+
+- Added a `CalMacroWidget` extension with a daily macro widget.
+- Added home screen quick actions for Add Food, Scan Barcode, Scan Label, and Manual Entry.
+- Added shared snapshot/value types so the widget and app use the same daily macro representation.
+- Reused the shared macro ring renderer instead of maintaining separate app and widget ring implementations.
+- Added app-open routing so widget taps and quick actions land in the right app flow.
+
+### Main implementation steps
+
+- Added `DailyMacroWidget.swift`, `CalMacroWidgetBundle.swift`, widget entitlements, and `Info-Widget.plist`.
+- Added shared cross-target types and loaders: `AppOpenRequest`, `NutritionSnapshot`, `MacroGoalsSnapshot`, `DailyMacroSnapshotLoader`, `SharedAppConfiguration`, and `SharedModelContainerFactory`.
+- Moved the app's persistent container creation onto the shared app-group-backed container so the widget can read the same data.
+- Added `WidgetTimelineReloader.swift` so app launches and mutations can refresh widget timelines.
+- Updated `AppRootView.swift`, `ContentView.swift`, and `cal_macro_trackerApp.swift` so app-open requests can route into add-food sheets and the dashboard from native entry points.
+- Added `HomeScreenQuickActionSupport.swift` and the corresponding iOS shortcut item configuration.
+
+### Bugs and implementation findings
+
+- The widget needed read access to the same persisted data as the app; the real fix was a shared app-group-backed model container rather than a second persistence path.
+- Home screen shortcuts and widget URLs are both just app-entry surfaces, so they now map into the same `AppOpenRequest` contract instead of inventing separate routing models.
+- Macro ring rendering had already gone through heavy iteration, so the widget work reused the shared renderer rather than cloning another visual implementation.
+
+## Scan Navigation Stability and Root-Level Cleanup
+
+### Delivered
+
+- Stabilized scan result navigation after photo imports.
+- Kept `BarcodeScanScreen` and `LabelScanScreen` as stable containers while still routing into `LogFoodScreen`.
+- Moved add-food data ownership down to the add-food feature instead of the app shell.
+- Centralized day-based `LogEntry` query construction for app and widget callers.
+- Reduced quick-action decoding duplication and narrowed scan photo-import sharing to the smallest useful helper.
+
+### Main implementation steps
+
+- Updated `BarcodeScanScreen.swift` and `LabelScanScreen.swift` to drive `LogFoodScreen` through destination state instead of replacing the whole screen body after a successful import/scan.
+- Added `Shared/LogEntryQuery.swift` so History, shared snapshot loading, and other day-based readers use the same fetch descriptor construction.
+- Trimmed `LogEntryDaySummary.swift` back to snapshot aggregation responsibilities after query construction moved into the shared helper.
+- Moved the `FoodItem` query into `AddFoodScreen.swift` and removed that data plumbing from `AppRootView.swift`.
+- Added `AppOpenRequest+QuickActions.swift` and simplified `HomeScreenQuickActionSupport.swift` so shortcut items decode once into the shared request model.
+- Added a narrow `ScanImageLoading.loadUIImage(from: PhotosPickerItem)` helper while keeping barcode-specific and label-specific orchestration local to their screens.
+
+### Bugs and implementation findings
+
+- The scan navigation regression was not a parsing or OCR problem; the real issue was replacing the scan screen's root body with `LogFoodScreen`, which made the photo-import path less stable inside the surrounding navigation/sheet flow.
+- The earlier broad shared `PhotosPickerItem` abstraction was still the wrong level of sharing, but a tiny loader helper was acceptable because it only removes duplicated image-decoding glue and does not hide feature-specific scan behavior.
+- Day-based query construction had started to split between app-only history logic and the shared/widget snapshot path; the fix was to centralize descriptor construction in one cross-target helper instead of re-copying date-range logic.
+- `AppRootView` had started carrying feature data it did not own; moving the `FoodItem` query back into `AddFoodScreen` restored the intended boundary where the app shell routes and the feature reads its own data.
+
+### Validation recorded during this follow-up
+
+- `make quality-format-check` passes.
+- iOS simulator build passes.
+- macOS build passes when code signing is disabled for local CLI validation.
+- Focused code review on the cleanup diff returned LGTM with no high-confidence findings.

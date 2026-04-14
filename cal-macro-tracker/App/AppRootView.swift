@@ -23,7 +23,6 @@ struct AppRootView: View {
 
     @Binding private var pendingOpenRequest: AppOpenRequest?
 
-    @Query(sort: \FoodItem.name) private var foods: [FoodItem]
     @State private var destination: Route?
     @State private var sheetDestination: AppRootSheetDestination?
 
@@ -52,7 +51,7 @@ struct AppRootView: View {
         }
         .sheet(item: $sheetDestination) { destination in
             NavigationStack {
-                AppRootSheetContent(destination: destination, foods: foods)
+                AppRootSheetContent(destination: destination)
             }
         }
         .onChange(of: pendingOpenRequest) { _, newValue in
@@ -95,14 +94,13 @@ private struct AppRootSheetContent: View {
     @Environment(\.dismiss) private var dismiss
 
     let destination: AppRootSheetDestination
-    let foods: [FoodItem]
 
     var body: some View {
         switch destination {
         case let .addFood(entryPoint):
             switch entryPoint {
             case .addFood:
-                AddFoodScreen(foods: foods)
+                AddFoodScreen()
             case .scanBarcode:
                 BarcodeScanScreen(onFoodLogged: dismissSheet, entryMode: .immediateCamera)
                     .toolbar {
@@ -122,7 +120,7 @@ private struct AppRootSheetContent: View {
                         }
                     }
             case .manualEntry:
-                AddFoodScreen(foods: foods, initialMode: .manual)
+                AddFoodScreen(initialMode: .manual)
             }
         case let .editLogEntry(entryID):
             EditLogEntrySheetContent(entryID: entryID)

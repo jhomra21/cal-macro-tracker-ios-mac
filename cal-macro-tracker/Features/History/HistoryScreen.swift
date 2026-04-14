@@ -155,7 +155,7 @@ private struct HistoryWeekStrip: View {
                 value: 1,
                 to: weekDays.last?.startDate ?? selectedDay.wrappedValue.startDate
             ) ?? selectedDay.wrappedValue.startDate
-        _entries = Query(LogEntryDaySummary.descriptor(start: weekStart, end: weekEnd))
+        _entries = Query(LogEntryQuery.descriptor(start: weekStart, end: weekEnd))
     }
 
     private var weekDays: [CalendarDay] {

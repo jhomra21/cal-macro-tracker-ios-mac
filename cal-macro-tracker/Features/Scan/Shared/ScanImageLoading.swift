@@ -1,13 +1,28 @@
 #if os(iOS)
 import CoreImage
 import ImageIO
+import PhotosUI
+import SwiftUI
 import UIKit
+
 struct ScanVisionImage {
     let cgImage: CGImage
     let orientation: CGImagePropertyOrientation
 }
 
 struct ScanImageLoading {
+    static func loadUIImage(from item: PhotosPickerItem) async throws -> UIImage {
+        guard let data = try await item.loadTransferable(type: Data.self) else {
+            throw NSError(
+                domain: "ScanImageLoading",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to load the selected image."]
+            )
+        }
+
+        return try loadUIImage(from: data)
+    }
+
     static func loadUIImage(from data: Data) throws -> UIImage {
         guard let image = UIImage(data: data) else {
             throw NSError(domain: "ScanImageLoading", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load the selected image."])

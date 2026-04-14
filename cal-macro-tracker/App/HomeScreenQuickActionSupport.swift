@@ -19,7 +19,7 @@ final class HomeScreenQuickActionAppDelegate: NSObject, UIApplicationDelegate, O
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
         if let shortcutItem = options.shortcutItem {
-            queue(shortcutItem)
+            _ = queue(shortcutItem)
         }
 
         let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
@@ -27,10 +27,15 @@ final class HomeScreenQuickActionAppDelegate: NSObject, UIApplicationDelegate, O
         return configuration
     }
 
-    fileprivate func queue(_ shortcutItem: UIApplicationShortcutItem) {
-        guard let request = HomeScreenQuickAction(shortcutItem: shortcutItem)?.request else { return }
+    private func queue(_ request: AppOpenRequest) {
         pendingRequest = request
         requestToken += 1
+    }
+
+    fileprivate func queue(_ shortcutItem: UIApplicationShortcutItem) -> Bool {
+        guard let request = AppOpenRequest(shortcutItem: shortcutItem) else { return false }
+        queue(request)
+        return true
     }
 }
 
@@ -40,40 +45,12 @@ final class HomeScreenQuickActionSceneDelegate: NSObject, UIWindowSceneDelegate 
         performActionFor shortcutItem: UIApplicationShortcutItem,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        guard
-            HomeScreenQuickAction(shortcutItem: shortcutItem) != nil,
-            let appDelegate = UIApplication.shared.delegate as? HomeScreenQuickActionAppDelegate
-        else {
+        guard let appDelegate = UIApplication.shared.delegate as? HomeScreenQuickActionAppDelegate else {
             completionHandler(false)
             return
         }
 
-        appDelegate.queue(shortcutItem)
-        completionHandler(true)
-    }
-}
-
-private enum HomeScreenQuickAction: String {
-    case addFood = "juan-test.cal-macro-tracker.add-food"
-    case scanBarcode = "juan-test.cal-macro-tracker.scan-barcode"
-    case scanLabel = "juan-test.cal-macro-tracker.scan-label"
-    case manualEntry = "juan-test.cal-macro-tracker.manual-entry"
-
-    init?(shortcutItem: UIApplicationShortcutItem) {
-        self.init(rawValue: shortcutItem.type)
-    }
-
-    var request: AppOpenRequest {
-        switch self {
-        case .addFood:
-            .addFood(.addFood)
-        case .scanBarcode:
-            .addFood(.scanBarcode)
-        case .scanLabel:
-            .addFood(.scanLabel)
-        case .manualEntry:
-            .addFood(.manualEntry)
-        }
+        completionHandler(appDelegate.queue(shortcutItem))
     }
 }
 #endif

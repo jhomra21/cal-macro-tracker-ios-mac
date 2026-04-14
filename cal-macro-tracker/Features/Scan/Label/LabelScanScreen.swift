@@ -73,17 +73,12 @@ struct LabelScanScreen: View {
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
-        do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                throw NSError(
-                    domain: "LabelScanScreen", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load the selected image."])
-            }
+        defer { selectedPhoto = nil }
 
-            let image = try ScanImageLoading.loadUIImage(from: data)
-            selectedPhoto = nil
+        do {
+            let image = try await ScanImageLoading.loadUIImage(from: item)
             await parseLabelImage(image)
         } catch {
-            selectedPhoto = nil
             errorMessage = error.localizedDescription
         }
     }
@@ -91,6 +86,8 @@ struct LabelScanScreen: View {
     private func parseLabelImage(_ image: UIImage) async {
         do {
             isLoading = true
+            defer { isLoading = false }
+
             let recognizedText = try await recognizer.recognizeText(in: image)
             let result = NutritionLabelParser.parse(recognizedText: recognizedText)
             logFoodDestination = LogFoodDestination(
@@ -98,9 +95,7 @@ struct LabelScanScreen: View {
                 reviewNotes: result.notes,
                 previewImageData: image.jpegData(compressionQuality: 0.9)
             )
-            isLoading = false
         } catch {
-            isLoading = false
             errorMessage = error.localizedDescription
         }
     }

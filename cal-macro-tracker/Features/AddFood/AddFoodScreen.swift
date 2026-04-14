@@ -3,8 +3,7 @@ import SwiftUI
 
 struct AddFoodScreen: View {
     @Environment(\.dismiss) private var dismiss
-
-    let foods: [FoodItem]
+    @Query(sort: \FoodItem.name) private var foods: [FoodItem]
 
     @State private var selectedMode: AddFoodMode = .search
     @State private var searchText = ""
@@ -35,8 +34,7 @@ struct AddFoodScreen: View {
     private let remotePageSize = 12
     private let packagedFoodSearchClient = PackagedFoodSearchClient()
 
-    init(foods: [FoodItem], initialMode: AddFoodMode = .search) {
-        self.foods = foods
+    init(initialMode: AddFoodMode = .search) {
         _selectedMode = State(initialValue: initialMode)
     }
 
