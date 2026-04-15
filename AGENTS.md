@@ -18,6 +18,8 @@ Think carefully and only action the specific task I have given you with the most
 
 Prefer the most concise and elegant solutions that changes or adds as little code as possible.
 
+Read `swift-dev.mdc` for specific swift coding guidance.
+
 ## Engineering Rules (Non-Negotiable)
 
 - Functional style first: prefer pure functions, immutable updates, explicit inputs/outputs.
