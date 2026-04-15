@@ -40,11 +40,11 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		1A1111111111111111111121 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		1A1111111111111111111121 /* Exceptions for "cal-macro-tracker" folder in "cal-macro-tracker" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				CalMacroWidget/CalMacroWidget.entitlements,
 				CalMacroWidget/CalMacroWidgetBundle.swift,
+				CalMacroWidget/DailyMacroAccessoryWidget.swift,
 				CalMacroWidget/DailyMacroWidget.swift,
 				Shared/AppOpenRequest.swift,
 				Shared/DailyMacroSnapshotLoader.swift,
@@ -64,17 +64,17 @@
 		0D8B87CF2F7D86E700453C64 /* cal-macro-tracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				1A1111111111111111111121 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+				1A1111111111111111111121 /* Exceptions for "cal-macro-tracker" folder in "cal-macro-tracker" target */,
 			);
 			path = "cal-macro-tracker";
 			sourceTree = "<group>";
 		};
-		1A1111111111111111111115 /* Shared */ = {
+		1A1111111111111111111115 /* cal-macro-tracker/Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "cal-macro-tracker/Shared";
 			sourceTree = "<group>";
 		};
-		1A1111111111111111111116 /* CalMacroWidget */ = {
+		1A1111111111111111111116 /* cal-macro-tracker/CalMacroWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "cal-macro-tracker/CalMacroWidget";
 			sourceTree = "<group>";
@@ -108,8 +108,8 @@
 			isa = PBXGroup;
 			children = (
 				0D8B87CF2F7D86E700453C64 /* cal-macro-tracker */,
-				1A1111111111111111111115 /* Shared */,
-				1A1111111111111111111116 /* CalMacroWidget */,
+				1A1111111111111111111115 /* cal-macro-tracker/Shared */,
+				1A1111111111111111111116 /* cal-macro-tracker/CalMacroWidget */,
 				1A1111111111111111111117 /* cal-macro-tracker/Data/Models */,
 				0D8B87CE2F7D86E700453C64 /* Products */,
 			);
@@ -143,7 +143,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0D8B87CF2F7D86E700453C64 /* cal-macro-tracker */,
-				1A1111111111111111111115 /* Shared */,
+				1A1111111111111111111115 /* cal-macro-tracker/Shared */,
 			);
 			name = "cal-macro-tracker";
 			packageProductDependencies = (
@@ -165,8 +165,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				1A1111111111111111111115 /* Shared */,
-				1A1111111111111111111116 /* CalMacroWidget */,
+				1A1111111111111111111115 /* cal-macro-tracker/Shared */,
+				1A1111111111111111111116 /* cal-macro-tracker/CalMacroWidget */,
 				1A1111111111111111111117 /* cal-macro-tracker/Data/Models */,
 			);
 			name = CalMacroWidget;

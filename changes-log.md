@@ -436,3 +436,33 @@ The following planning documents have been fully consolidated into this file and
 
 - `make quality-format-check` passes.
 - iOS simulator build passes.
+
+## Lock Screen Daily Macro Widget
+
+### Delivered
+
+- Added a dedicated Lock Screen daily macro widget alongside the existing Home Screen widget.
+- Kept the current Home Screen widget unchanged for `.systemSmall` and `.systemMedium`.
+- Added Lock Screen support for `.accessoryInline`, `.accessoryCircular`, and `.accessoryRectangular`.
+- Reused the existing shared app-group-backed widget data path and deep-link routing instead of introducing a second widget data model.
+
+### Main implementation steps
+
+- Added `DailyMacroAccessoryWidget.swift` under `cal-macro-tracker/CalMacroWidget/`.
+- Updated `CalMacroWidgetBundle.swift` so the widget extension now exports both `DailyMacroWidget()` and `DailyMacroAccessoryWidget()`.
+- Added `SharedAppConfiguration.dailyMacroAccessoryWidgetKind` so the Lock Screen widget has its own WidgetKit kind.
+- Updated `WidgetTimelineReloader.swift` so data changes refresh both the Home Screen and Lock Screen widget timelines.
+- Updated the Xcode synchronized-group exception list so the new widget file stays out of the app target and only compiles in the widget extension.
+
+### Bugs and implementation findings
+
+- The current widget setup already supported the Home Screen; the actual missing surface was the Lock Screen, because the existing widget only declared `.systemSmall` and `.systemMedium`.
+- The widget architecture already had the right shared contracts (`DailyMacroSnapshotLoader`, `SharedModelContainerFactory`, `AppOpenRequest`), so the correct implementation was a new accessory widget presentation layer rather than a new persistence or routing path.
+- Adding a second widget kind required timeline reload coverage for both kinds; otherwise the new Lock Screen widget could lag behind the Home Screen widget after log-entry or goal changes.
+- A dedicated accessory widget kept the implementation simpler than folding Lock Screen families into the existing Home Screen widget file, which would have increased family-specific branching and tracing complexity.
+
+### Validation recorded during this widget follow-up
+
+- `make quality-format-check` passes.
+- iOS simulator app build passes.
+- iOS simulator widget build passes.

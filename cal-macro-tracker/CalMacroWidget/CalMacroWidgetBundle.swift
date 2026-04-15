@@ -5,5 +5,8 @@ import WidgetKit
 struct CalMacroWidgetBundle: WidgetBundle {
     var body: some Widget {
         DailyMacroWidget()
+        #if os(iOS)
+        DailyMacroAccessoryWidget()
+        #endif
     }
 }

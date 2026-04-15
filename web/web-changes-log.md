@@ -166,3 +166,20 @@
 - The remote support database exists and is bound as `SUPPORT_DB`.
 - The `support_requests` schema has been applied locally and remotely.
 - The deploy path now includes the required remote migration step before deployment.
+
+## Aesthetics Overhaul: Apple Native Design
+
+### Delivered
+
+- Refactored `src/styles/global.css` to adopt standard iOS dynamic colors (`#ffffff` and `#f2f2f7` for light mode; `#000000` and `#1c1c1e` for dark mode).
+- Implemented true translucency in the sticky header (`backdrop-filter`) to replicate the signature Apple web header.
+- Scrapped complex circular background gradients from the `page-shell`.
+- Re-architected typography to reference the Apple `SF Pro Display` design by incorporating tighter letter spacing (`-0.04em`).
+- Flattened the DOM hierarchy inside of `src/pages/index.astro`, removing complex 3D skew rendering logic to follow the "reduce layers" philosophy.
+- Transitioned feature cards and screenshot galleries into a standard Apple "Bento-Box" styling layout (with 24px/32px radii, precise borders, and soft drop-shadows).
+
+### Main implementation steps
+
+- Streamlined CSS footprint avoiding multi-layered abstractions per `code-simplifier.md`.
+- Rewrote `index.astro` to render simple flex/grid combinations directly mapping to the new bento styles, instead of nested device shells.
+- Left Astro layout components, asset optimization pipelines, and backend routing untouched.
