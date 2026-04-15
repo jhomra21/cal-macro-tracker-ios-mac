@@ -7,41 +7,21 @@ A native and minimal SwiftUI calorie and macro tracking app for iPhone. No accou
 ### Home
 
 <p align="center">
-  <img src="media-assets/home1.jpeg" alt="Home screen overview" width="220" />
+  <img src="web/public/app-images/home1.jpeg" alt="Home screen overview" width="220" />
   &nbsp;&nbsp;
-  <img src="media-assets/home2.jpeg" alt="Home screen scrolled" width="220" />
+  <img src="web/public/app-images/home2.jpeg" alt="Home screen scrolled" width="220" />
 </p>
 
 ### Logging
 
 <p align="center">
-  <img src="media-assets/add-search.jpeg" alt="Food search" width="220" />
-  &nbsp;&nbsp;
-  <img src="media-assets/log-food.jpeg" alt="Log food" width="220" />
-  &nbsp;&nbsp;
-  <img src="media-assets/edit-entry.jpeg" alt="Edit entry" width="220" />
+  <img src="web/public/app-images/add-search.jpeg" alt="Food search" width="220" />
 </p>
 
 ### History
 
 <p align="center">
-  <img src="media-assets/calendar-closed.jpeg" alt="Calendar collapsed" width="220" />
-  &nbsp;&nbsp;
-  <img src="media-assets/calendar-open.jpeg" alt="Calendar expanded" width="220" />
-</p>
-
-### Interactions
-
-<p align="center">
-  <img src="media-assets/swipe-left.jpeg" alt="Swipe left action" width="220" />
-  &nbsp;&nbsp;
-  <img src="media-assets/swipe-right.jpeg" alt="Swipe right action" width="220" />
-</p>
-
-### Settings
-
-<p align="center">
-  <img src="media-assets/settings.jpeg" alt="Settings screen" width="220" />
+  <img src="web/public/app-images/calendar-open.jpeg" alt="Calendar expanded" width="220" />
 </p>
 
 ## Features
