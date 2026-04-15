@@ -16,18 +16,7 @@ struct EditLogEntryScreen: View {
 
     init(entry: LogEntry) {
         self.entry = entry
-
-        var initialDraft = FoodDraft()
-        initialDraft.name = entry.foodName
-        initialDraft.brand = entry.brand ?? ""
-        initialDraft.source = entry.sourceKind
-        initialDraft.servingDescription = entry.servingDescription
-        initialDraft.gramsPerServing = entry.gramsPerServing
-        initialDraft.caloriesPerServing = entry.caloriesPerServing
-        initialDraft.proteinPerServing = entry.proteinPerServing
-        initialDraft.fatPerServing = entry.fatPerServing
-        initialDraft.carbsPerServing = entry.carbsPerServing
-        initialDraft.saveAsCustomFood = false
+        let initialDraft = FoodDraft(logEntry: entry, saveAsCustomFood: false)
 
         let initialQuantityAmountText = NumericText.editingDisplay(
             for: entry.quantityModeKind == .servings ? entry.servingsConsumed : entry.gramsConsumed)
@@ -69,19 +58,11 @@ struct EditLogEntryScreen: View {
             keyboardFields: FoodDraftField.formOrder + [.quantityAmount],
             previewTotals: previewTotals
         ) {
-            Section("Quantity") {
-                Picker("Mode", selection: $quantityMode) {
-                    Text("Servings").tag(QuantityMode.servings)
-                    Text("Grams").tag(QuantityMode.grams)
-                }
-                .pickerStyle(.segmented)
-
-                if quantityMode == .grams && previewDraft.canLogByGrams == false {
-                    Text("Add grams per serving to log by grams.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
+            FoodQuantitySection(
+                quantityMode: $quantityMode,
+                canLogByGrams: previewDraft.canLogByGrams,
+                showsGramLoggingMessageOnlyInGramsMode: true
+            ) { quantityMode in
                 AppNumericTextField(
                     quantityMode == .servings ? "Servings eaten" : "Grams eaten",
                     text: $quantityAmountText,
@@ -105,16 +86,6 @@ struct EditLogEntryScreen: View {
         }
         .navigationTitle("Edit Entry")
         .inlineNavigationTitle()
-        .onAppear {
-            if !previewDraft.canLogByGrams {
-                quantityMode = .servings
-            }
-        }
-        .onChange(of: previewDraft.canLogByGrams) { _, canLogByGrams in
-            if !canLogByGrams && quantityMode == .grams {
-                quantityMode = .servings
-            }
-        }
     }
 
     private var logEntryRepository: LogEntryRepository {

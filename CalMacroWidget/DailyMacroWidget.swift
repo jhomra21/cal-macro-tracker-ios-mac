@@ -94,9 +94,9 @@ private struct DailyMacroWidgetContentView: View {
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 10) {
-                smallMetric(title: "P", value: entry.snapshot.totals.protein)
-                smallMetric(title: "C", value: entry.snapshot.totals.carbs)
-                smallMetric(title: "F", value: entry.snapshot.totals.fat)
+                ForEach(MacroMetric.allCases) { metric in
+                    smallMetric(metric: metric)
+                }
             }
         }
         .padding(12)
@@ -120,9 +120,9 @@ private struct DailyMacroWidgetContentView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
 
-                mediumMetric(title: "Protein", value: entry.snapshot.totals.protein)
-                mediumMetric(title: "Carbs", value: entry.snapshot.totals.carbs)
-                mediumMetric(title: "Fat", value: entry.snapshot.totals.fat)
+                ForEach(MacroMetric.allCases) { metric in
+                    mediumMetric(metric: metric)
+                }
             }
 
             Spacer(minLength: 0)
@@ -130,28 +130,28 @@ private struct DailyMacroWidgetContentView: View {
         .padding(16)
     }
 
-    private func smallMetric(title: String, value: Double) -> some View {
+    private func smallMetric(metric: MacroMetric) -> some View {
         VStack(spacing: 3) {
-            Text(title)
+            Text(metric.shortTitle)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Text(value.roundedForDisplay)
+            Text(metric.value(from: entry.snapshot.totals).roundedForDisplay)
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func mediumMetric(title: String, value: Double) -> some View {
+    private func mediumMetric(metric: MacroMetric) -> some View {
         HStack(spacing: 8) {
-            Text(title)
+            Text(metric.title)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
 
             Spacer(minLength: 0)
 
-            Text("\(value.roundedForDisplay)g")
+            Text("\(metric.value(from: entry.snapshot.totals).roundedForDisplay)g")
                 .font(.headline.weight(.semibold))
                 .monospacedDigit()
         }

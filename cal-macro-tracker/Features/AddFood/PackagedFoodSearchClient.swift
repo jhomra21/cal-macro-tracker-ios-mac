@@ -81,10 +81,10 @@ enum PackagedFoodSearchClientError: LocalizedError {
 struct PackagedFoodSearchClient {
     static let minimumQueryLength = 2
 
-    private let session: URLSession
+    private let jsonClient: HTTPJSONClient
 
     init(session: URLSession = .shared) {
-        self.session = session
+        jsonClient = HTTPJSONClient(session: session)
     }
 
     func searchFoods(
@@ -116,22 +116,22 @@ struct PackagedFoodSearchClient {
             throw PackagedFoodSearchClientError.invalidResponse
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("cal-macro-tracker/1.0 (juan-test.cal-macro-tracker)", forHTTPHeaderField: "User-Agent")
+        let request = jsonClient.makeRequest(url: url, acceptJSON: true)
+        let data: Data
+        let httpResponse: HTTPURLResponse
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
+        do {
+            (data, httpResponse) = try await jsonClient.data(for: request)
+        } catch HTTPJSONClientError.invalidResponse {
             throw PackagedFoodSearchClientError.invalidResponse
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let errorResponse = try? JSONDecoder().decode(PackagedFoodSearchErrorResponse.self, from: data)
+            let errorResponse = jsonClient.decodeIfPresent(PackagedFoodSearchErrorResponse.self, from: data)
             throw PackagedFoodSearchClientError.requestFailed(statusCode: httpResponse.statusCode, message: errorResponse?.error)
         }
 
-        let decodedResponse = try JSONDecoder().decode(PackagedFoodSearchResponse.self, from: data)
+        let decodedResponse = try jsonClient.decode(PackagedFoodSearchResponse.self, from: data)
         return try decodedResponse.pageResults()
     }
 }

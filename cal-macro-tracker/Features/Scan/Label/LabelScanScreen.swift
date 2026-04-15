@@ -73,14 +73,16 @@ struct LabelScanScreen: View {
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
-        defer { selectedPhoto = nil }
-
-        do {
-            let image = try await ScanImageLoading.loadUIImage(from: item)
-            await parseLabelImage(image)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        await ScanStillImageImport.loadSelectedPhoto(
+            item,
+            clearSelection: { selectedPhoto = nil },
+            processImage: { image in
+                await parseLabelImage(image)
+            },
+            onError: { message in
+                errorMessage = message
+            }
+        )
     }
 
     private func parseLabelImage(_ image: UIImage) async {

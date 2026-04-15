@@ -76,18 +76,22 @@ struct ManualFoodEntryScreen: View {
 
     @State private var draft = FoodDraft()
     @State private var numericText = FoodDraftNumericText(draft: FoodDraft())
+    @State private var errorMessage: String?
     @FocusState private var focusedField: FoodDraftField?
 
     var body: some View {
-        Form {
-            FoodDraftFormSections(
-                draft: $draft,
-                numericText: $numericText,
-                brandPrompt: "Brand (optional)",
-                gramsPrompt: "Grams per serving (optional)",
-                focusedField: $focusedField
-            )
-
+        FoodDraftEditorForm(
+            draft: $draft,
+            numericText: $numericText,
+            errorMessage: $errorMessage,
+            brandPrompt: "Brand (optional)",
+            gramsPrompt: "Grams per serving (optional)",
+            focusedField: $focusedField,
+            keyboardFields: FoodDraftField.formOrder,
+            previewTotals: nil
+        ) {
+            EmptyView()
+        } footerSections: {
             Section {
                 NavigationLink {
                     LogFoodScreen(
@@ -100,8 +104,6 @@ struct ManualFoodEntryScreen: View {
                 .disabled(!canContinue)
             }
         }
-        .scrollDismissesKeyboard(.interactively)
-        .keyboardNavigationToolbar(focusedField: $focusedField, fields: FoodDraftField.formOrder)
     }
 
     private var canContinue: Bool {

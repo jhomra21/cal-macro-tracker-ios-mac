@@ -364,3 +364,35 @@ The following planning documents have been fully consolidated into this file and
 - iOS simulator build passes.
 - macOS build passes when code signing is disabled for local CLI validation.
 - Focused code review on the cleanup diff returned LGTM with no high-confidence findings.
+
+## Shared Draft / Macro / Scan Cleanup
+
+### Delivered
+
+- Added `Shared/MacroMetric.swift` to centralize macro labels, colors, and value access across dashboard and widget surfaces.
+- Added `FoodDraftImportedData.swift` so imported food values can be mapped once and reused across barcode, USDA, label-scan, and edit-entry flows.
+- Added `FoodQuantitySection.swift` so log/edit quantity controls share one quantity-mode section and one gram-logging guard.
+- Added `HTTPJSONClient.swift` to centralize JSON request construction, HTTP response validation, and decoding for network clients.
+- Added `ScanStillImageImport.swift` to share the tiny still-image photo-import path between barcode and label flows.
+
+### Main implementation steps
+
+- Replaced repeated protein/carbs/fat view code in `DailyMacroWidget.swift`, `CompactMacroSummaryView.swift`, `DashboardScreen.swift`, and `MacroRingSetView.swift` with `MacroMetric.allCases`.
+- Refactored `FoodDraft.swift` so `FoodItem`, `LogEntry`, USDA, barcode, and label parsers all build drafts through shared imported-data initialization instead of repeating field assignment blocks.
+- Moved manual food entry onto `FoodDraftEditorForm` so it uses the same form container, keyboard toolbar, and error-banner path as the other food editors.
+- Replaced duplicated quantity pickers and gram-mode fallback logic in `LogFoodScreen.swift` and `EditLogEntryScreen.swift` with `FoodQuantitySection`.
+- Replaced duplicated request/header/response/decode glue in `PackagedFoodSearchClient.swift` and `OpenFoodFactsClient.swift` with `HTTPJSONClient`.
+- Replaced duplicated still-image import handling in `BarcodeScanScreen.swift` and `LabelScanScreen.swift` with `ScanStillImageImport`.
+
+### Code removed / deduplicated
+
+- Removed hand-written macro rows/cards from widget and dashboard surfaces that only differed by macro type.
+- Removed repeated `var draft = FoodDraft()` mapping blocks from USDA, barcode, label-scan, and log-entry conversion paths.
+- Removed duplicated quantity-section lifecycle code (`onAppear` / `onChange` mode normalization) from both logging screens.
+- Removed duplicated photo-import `defer` / `do-catch` glue from barcode and label scan screens.
+- Removed duplicated `URLRequest` header setup and ad-hoc `JSONDecoder` call sites from both network clients.
+
+### Validation recorded during this cleanup
+
+- `make quality-format-check` passes.
+- iOS simulator build passes.

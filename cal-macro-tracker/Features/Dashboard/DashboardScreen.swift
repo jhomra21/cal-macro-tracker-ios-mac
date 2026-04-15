@@ -128,32 +128,34 @@ private struct MacroLegendView: View {
     let totals: NutritionSnapshot
     let goals: DailyGoals
 
+    private var goalSnapshot: MacroGoalsSnapshot {
+        MacroGoalsSnapshot(goals: goals)
+    }
+
     var body: some View {
         HStack(spacing: 24) {
-            legendCard(
-                title: "Protein", value: totals.protein, goal: goals.proteinGoalGrams, color: .blue)
-            legendCard(
-                title: "Carbs", value: totals.carbs, goal: goals.carbGoalGrams, color: .orange)
-            legendCard(title: "Fat", value: totals.fat, goal: goals.fatGoalGrams, color: .pink)
+            ForEach(MacroMetric.allCases) { metric in
+                legendCard(metric: metric)
+            }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func legendCard(title: String, value: Double, goal: Double, color: Color) -> some View {
+    private func legendCard(metric: MacroMetric) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(color)
+                    .fill(metric.accentColor)
                     .frame(width: 10, height: 10)
-                Text(title)
+                Text(metric.title)
                     .font(.subheadline.weight(.medium))
             }
 
-            Text("\(value.roundedForDisplay)g")
+            Text("\(metric.value(from: totals).roundedForDisplay)g")
                 .font(.title3.weight(.semibold))
                 .monospacedDigit()
 
-            Text("Goal \(goal.roundedForDisplay)g")
+            Text("Goal \(metric.goal(from: goalSnapshot).roundedForDisplay)g")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

@@ -11,30 +11,19 @@ struct CompactMacroSummaryView: View {
         self.horizontalPadding = horizontalPadding
     }
 
+    private var goalSnapshot: MacroGoalsSnapshot {
+        MacroGoalsSnapshot(goals: goals)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             CompactMacroRingView(totals: totals, goals: goals)
                 .frame(width: 72, height: 72)
                 .frame(maxWidth: .infinity)
 
-            macroColumn(
-                title: "Protein",
-                value: totals.protein,
-                goal: goals.proteinGoalGrams,
-                color: .blue
-            )
-            macroColumn(
-                title: "Carbs",
-                value: totals.carbs,
-                goal: goals.carbGoalGrams,
-                color: .orange
-            )
-            macroColumn(
-                title: "Fat",
-                value: totals.fat,
-                goal: goals.fatGoalGrams,
-                color: .pink
-            )
+            ForEach(MacroMetric.allCases) { metric in
+                macroColumn(metric: metric)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 7)
@@ -43,21 +32,21 @@ struct CompactMacroSummaryView: View {
         .padding(.horizontal, horizontalPadding)
     }
 
-    private func macroColumn(title: String, value: Double, goal: Double, color: Color) -> some View {
+    private func macroColumn(metric: MacroMetric) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(color)
+                    .fill(metric.accentColor)
                     .frame(width: 8, height: 8)
-                Text(title)
+                Text(metric.title)
                     .font(.caption.weight(.medium))
             }
 
-            Text("\(value.roundedForDisplay)g")
+            Text("\(metric.value(from: totals).roundedForDisplay)g")
                 .font(.headline.weight(.semibold))
                 .monospacedDigit()
 
-            Text("Goal \(goal.roundedForDisplay)g")
+            Text("Goal \(metric.goal(from: goalSnapshot).roundedForDisplay)g")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

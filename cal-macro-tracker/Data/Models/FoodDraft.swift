@@ -47,6 +47,8 @@ enum ReusableFoodPersistenceMode: Equatable {
 }
 
 struct FoodDraft: Identifiable, Hashable {
+    static let defaultServingDescription = "1 serving"
+
     var id: UUID = UUID()
     var foodItemID: UUID?
     var name: String = ""
@@ -56,7 +58,7 @@ struct FoodDraft: Identifiable, Hashable {
     var externalProductID: String = ""
     var sourceName: String = ""
     var sourceURL: String = ""
-    var servingDescription: String = "1 serving"
+    var servingDescription: String = FoodDraft.defaultServingDescription
     var gramsPerServing: Double?
     var caloriesPerServing: Double = 0
     var proteinPerServing: Double = 0
@@ -67,35 +69,64 @@ struct FoodDraft: Identifiable, Hashable {
     init() {}
 
     init(foodItem: FoodItem, saveAsCustomFood: Bool = false) {
-        self.id = UUID()
-        self.foodItemID = foodItem.id
-        self.name = foodItem.name
-        self.brand = foodItem.brand ?? ""
-        self.source = foodItem.sourceKind
-        self.barcode = foodItem.barcode ?? ""
-        self.externalProductID = foodItem.externalProductID ?? ""
-        self.sourceName = foodItem.sourceName ?? ""
-        self.sourceURL = foodItem.sourceURL ?? ""
-        self.servingDescription = foodItem.servingDescription
-        self.gramsPerServing = foodItem.gramsPerServing
-        self.caloriesPerServing = foodItem.caloriesPerServing
-        self.proteinPerServing = foodItem.proteinPerServing
-        self.fatPerServing = foodItem.fatPerServing
-        self.carbsPerServing = foodItem.carbsPerServing
-        self.saveAsCustomFood = saveAsCustomFood
+        self.init(
+            importedData: FoodDraftImportedData(
+                name: foodItem.name,
+                brand: foodItem.brand,
+                source: foodItem.sourceKind,
+                barcode: foodItem.barcode,
+                externalProductID: foodItem.externalProductID,
+                sourceName: foodItem.sourceName,
+                sourceURL: foodItem.sourceURL,
+                servingDescription: foodItem.servingDescription,
+                gramsPerServing: foodItem.gramsPerServing,
+                caloriesPerServing: foodItem.caloriesPerServing,
+                proteinPerServing: foodItem.proteinPerServing,
+                fatPerServing: foodItem.fatPerServing,
+                carbsPerServing: foodItem.carbsPerServing
+            ),
+            foodItemID: foodItem.id,
+            saveAsCustomFood: saveAsCustomFood
+        )
     }
 
     init(logEntry: LogEntry, saveAsCustomFood: Bool = false) {
+        self.init(
+            importedData: FoodDraftImportedData(
+                name: logEntry.foodName,
+                brand: logEntry.brand,
+                source: logEntry.sourceKind,
+                servingDescription: logEntry.servingDescription,
+                gramsPerServing: logEntry.gramsPerServing,
+                caloriesPerServing: logEntry.caloriesPerServing,
+                proteinPerServing: logEntry.proteinPerServing,
+                fatPerServing: logEntry.fatPerServing,
+                carbsPerServing: logEntry.carbsPerServing
+            ),
+            saveAsCustomFood: saveAsCustomFood
+        )
+    }
+
+    init(importedData: FoodDraftImportedData, saveAsCustomFood: Bool = true) {
+        self.init(importedData: importedData, foodItemID: nil, saveAsCustomFood: saveAsCustomFood)
+    }
+
+    private init(importedData: FoodDraftImportedData, foodItemID: UUID?, saveAsCustomFood: Bool) {
         self.id = UUID()
-        self.name = logEntry.foodName
-        self.brand = logEntry.brand ?? ""
-        self.source = logEntry.sourceKind
-        self.servingDescription = logEntry.servingDescription
-        self.gramsPerServing = logEntry.gramsPerServing
-        self.caloriesPerServing = logEntry.caloriesPerServing
-        self.proteinPerServing = logEntry.proteinPerServing
-        self.fatPerServing = logEntry.fatPerServing
-        self.carbsPerServing = logEntry.carbsPerServing
+        self.foodItemID = foodItemID
+        self.name = importedData.name
+        self.brand = importedData.brand ?? ""
+        self.source = importedData.source
+        self.barcode = importedData.barcode ?? ""
+        self.externalProductID = importedData.externalProductID ?? ""
+        self.sourceName = importedData.sourceName ?? ""
+        self.sourceURL = importedData.sourceURL ?? ""
+        self.servingDescription = importedData.servingDescription
+        self.gramsPerServing = importedData.gramsPerServing
+        self.caloriesPerServing = importedData.caloriesPerServing
+        self.proteinPerServing = importedData.proteinPerServing
+        self.fatPerServing = importedData.fatPerServing
+        self.carbsPerServing = importedData.carbsPerServing
         self.saveAsCustomFood = saveAsCustomFood
     }
 

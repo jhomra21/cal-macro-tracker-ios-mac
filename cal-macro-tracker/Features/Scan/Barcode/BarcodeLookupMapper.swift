@@ -29,23 +29,23 @@ struct BarcodeLookupMapper {
         let name = product.productName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let nutritionBasis = try nutritionBasis(for: product)
         let resolvedBarcode = OpenFoodFactsIdentity.barcodeAliases(for: barcode ?? product.code).first ?? ""
-
-        var draft = FoodDraft()
-        draft.name = name
-        draft.brand = product.brands?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        draft.source = source
-        draft.barcode = resolvedBarcode
-        draft.externalProductID = product.resolvedExternalProductID(preferredBarcode: resolvedBarcode) ?? ""
-        draft.sourceName = "Open Food Facts"
-        draft.sourceURL = product.url?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        draft.servingDescription = nutritionBasis.servingDescription
-        draft.gramsPerServing = nutritionBasis.gramsPerServing
-        draft.caloriesPerServing = nutritionBasis.calories
-        draft.proteinPerServing = nutritionBasis.protein
-        draft.fatPerServing = nutritionBasis.fat
-        draft.carbsPerServing = nutritionBasis.carbs
-        draft.saveAsCustomFood = true
-        return draft
+        return FoodDraft(
+            importedData: FoodDraftImportedData(
+                name: name,
+                brand: product.brands?.trimmingCharacters(in: .whitespacesAndNewlines),
+                source: source,
+                barcode: resolvedBarcode,
+                externalProductID: product.resolvedExternalProductID(preferredBarcode: resolvedBarcode),
+                sourceName: "Open Food Facts",
+                sourceURL: product.url?.trimmingCharacters(in: .whitespacesAndNewlines),
+                servingDescription: nutritionBasis.servingDescription,
+                gramsPerServing: nutritionBasis.gramsPerServing,
+                caloriesPerServing: nutritionBasis.calories,
+                proteinPerServing: nutritionBasis.protein,
+                fatPerServing: nutritionBasis.fat,
+                carbsPerServing: nutritionBasis.carbs
+            )
+        )
     }
 
     private static func nutritionBasis(for product: OpenFoodFactsProduct) throws -> NutritionBasis {

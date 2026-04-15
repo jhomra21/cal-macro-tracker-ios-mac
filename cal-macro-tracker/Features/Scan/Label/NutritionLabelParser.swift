@@ -10,17 +10,18 @@ enum NutritionLabelParser {
         let parsedText = ParsedLabelText(recognizedText: recognizedText)
         let detectedServingDescription = servingDescription(from: parsedText)
         let detectedNutrients = detectedNutrients(from: parsedText.nutritionLines)
-
-        var draft = FoodDraft()
-        draft.source = .labelScan
-        draft.name = inferredName(from: parsedText)
-        draft.servingDescription = detectedServingDescription ?? draft.servingDescription
-        draft.gramsPerServing = gramsPerServing(from: parsedText)
-        draft.caloriesPerServing = detectedNutrients.calories ?? 0
-        draft.proteinPerServing = detectedNutrients.protein ?? 0
-        draft.fatPerServing = detectedNutrients.fat ?? 0
-        draft.carbsPerServing = detectedNutrients.carbs ?? 0
-        draft.saveAsCustomFood = true
+        let draft = FoodDraft(
+            importedData: FoodDraftImportedData(
+                name: inferredName(from: parsedText),
+                source: .labelScan,
+                servingDescription: detectedServingDescription ?? FoodDraft.defaultServingDescription,
+                gramsPerServing: gramsPerServing(from: parsedText),
+                caloriesPerServing: detectedNutrients.calories ?? 0,
+                proteinPerServing: detectedNutrients.protein ?? 0,
+                fatPerServing: detectedNutrients.fat ?? 0,
+                carbsPerServing: detectedNutrients.carbs ?? 0
+            )
+        )
 
         return NutritionLabelParseResult(
             draft: draft,

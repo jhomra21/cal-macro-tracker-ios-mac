@@ -81,11 +81,9 @@ struct MacroRingSetView: View {
     }
 
     private var ringMetrics: [RingMetric] {
-        let progresses = [
-            progress(consumed: totals.protein, goal: goals.proteinGoalGrams),
-            progress(consumed: totals.carbs, goal: goals.carbGoalGrams),
-            progress(consumed: totals.fat, goal: goals.fatGoalGrams)
-        ]
+        let progresses = MacroMetric.allCases.map { metric in
+            progress(consumed: metric.value(from: totals), goal: metric.goal(from: goals))
+        }
 
         return zip(progresses, baseMetrics).map { progress, colors in
             RingMetric(

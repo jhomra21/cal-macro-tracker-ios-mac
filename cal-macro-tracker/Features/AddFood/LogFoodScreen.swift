@@ -119,13 +119,11 @@ struct LogFoodScreen: View {
                 }
             }
 
-            Section("Quantity") {
-                Picker("Mode", selection: $quantityMode) {
-                    Text("Servings").tag(QuantityMode.servings)
-                    Text("Grams").tag(QuantityMode.grams)
-                }
-                .pickerStyle(.segmented)
-
+            FoodQuantitySection(
+                quantityMode: $quantityMode,
+                canLogByGrams: draft.canLogByGrams,
+                gramLoggingMessage: "Add grams per serving to enable gram-based logging."
+            ) { quantityMode in
                 if quantityMode == .servings {
                     Stepper(value: $servingsAmount, in: 0.25...20, step: 0.25) {
                         LabeledContent("Servings") {
@@ -140,12 +138,6 @@ struct LogFoodScreen: View {
                                 .monospacedDigit()
                         }
                     }
-                }
-
-                if !draft.canLogByGrams {
-                    Text("Add grams per serving to enable gram-based logging.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
             }
         } footerSections: {
@@ -195,16 +187,6 @@ struct LogFoodScreen: View {
             }
         }
         #endif
-        .onAppear {
-            if !draft.canLogByGrams {
-                quantityMode = .servings
-            }
-        }
-        .onChange(of: draft.canLogByGrams) { _, canLogByGrams in
-            if !canLogByGrams && quantityMode == .grams {
-                quantityMode = .servings
-            }
-        }
     }
 
     private var logEntryRepository: LogEntryRepository {

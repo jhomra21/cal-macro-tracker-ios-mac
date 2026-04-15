@@ -165,14 +165,16 @@ struct BarcodeScanScreen: View {
     }
 
     private func loadSelectedPhoto(_ item: PhotosPickerItem) async {
-        defer { selectedPhoto = nil }
-
-        do {
-            let image = try await ScanImageLoading.loadUIImage(from: item)
-            await scanSelectedImage(image, captureSource: .photoLibrary)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+        await ScanStillImageImport.loadSelectedPhoto(
+            item,
+            clearSelection: { selectedPhoto = nil },
+            processImage: { image in
+                await scanSelectedImage(image, captureSource: .photoLibrary)
+            },
+            onError: { message in
+                errorMessage = message
+            }
+        )
     }
 
     private func scanSelectedImage(_ image: UIImage, captureSource: BarcodeCaptureSource) async {

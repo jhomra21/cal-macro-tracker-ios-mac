@@ -176,10 +176,10 @@ enum OpenFoodFactsClientError: LocalizedError {
 }
 
 struct OpenFoodFactsClient {
-    private let session: URLSession
+    private let jsonClient: HTTPJSONClient
 
     init(session: URLSession = .shared) {
-        self.session = session
+        jsonClient = HTTPJSONClient(session: session)
     }
 
     func fetchProduct(barcode: String) async throws -> OpenFoodFactsProduct {
@@ -199,12 +199,13 @@ struct OpenFoodFactsClient {
     }
 
     private func sendRequest<Response: Decodable>(url: URL) async throws -> Response {
-        var request = URLRequest(url: url)
-        request.setValue("cal-macro-tracker/1.0 (juan-test.cal-macro-tracker)", forHTTPHeaderField: "User-Agent")
+        let request = jsonClient.makeRequest(url: url)
+        let data: Data
+        let httpResponse: HTTPURLResponse
 
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
+        do {
+            (data, httpResponse) = try await jsonClient.data(for: request)
+        } catch HTTPJSONClientError.invalidResponse {
             throw OpenFoodFactsClientError.invalidResponse
         }
 
@@ -212,6 +213,6 @@ struct OpenFoodFactsClient {
             throw OpenFoodFactsClientError.requestFailed(statusCode: httpResponse.statusCode)
         }
 
-        return try JSONDecoder().decode(Response.self, from: data)
+        return try jsonClient.decode(Response.self, from: data)
     }
 }
