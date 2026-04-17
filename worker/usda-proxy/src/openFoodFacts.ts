@@ -1,7 +1,6 @@
 import type { OpenFoodFactsProxyNutriments, OpenFoodFactsProxyProduct, ProviderPage } from './types'
 
 const OPEN_FOOD_FACTS_SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl'
-const USER_AGENT = 'cal-macro-tracker/1.0 (juan-test.cal-macro-tracker)'
 const SEARCH_FIELDS = [
   '_id',
   'code',
@@ -41,12 +40,14 @@ interface OpenFoodFactsRawProduct {
 export class OpenFoodFactsClientError extends Error {
   readonly status: number
   readonly retryable: boolean
+  readonly retryAfterMs?: number
 
-  constructor(message: string, status: number, retryable: boolean) {
+  constructor(message: string, status: number, retryable: boolean, retryAfterMs?: number) {
     super(message)
     this.name = 'OpenFoodFactsClientError'
     this.status = status
     this.retryable = retryable
+    this.retryAfterMs = retryAfterMs
   }
 }
 
@@ -56,8 +57,13 @@ export interface OpenFoodFactsQuery {
   pageSize: number
 }
 
+export interface OpenFoodFactsRequestOptions {
+  userAgent: string
+}
+
 export async function searchOpenFoodFactsFoods(
   input: OpenFoodFactsQuery,
+  options: OpenFoodFactsRequestOptions,
   fetcher: typeof fetch = fetch,
 ): Promise<ProviderPage<OpenFoodFactsProxyProduct>> {
   const requestedPage = Math.max(1, input.page)
@@ -75,6 +81,7 @@ export async function searchOpenFoodFactsFoods(
         page: currentRawPage,
         pageSize: requestedPageSize,
       },
+      options,
       fetcher,
     )
 
@@ -97,22 +104,33 @@ export async function searchOpenFoodFactsFoods(
 
 async function fetchOpenFoodFactsPage(
   input: OpenFoodFactsQuery,
+  options: OpenFoodFactsRequestOptions,
   fetcher: typeof fetch,
 ): Promise<OpenFoodFactsRawPage> {
   const response = await fetcher(buildSearchURL(input), {
     headers: {
       Accept: 'application/json',
-      'User-Agent': USER_AGENT,
+      'User-Agent': options.userAgent,
     },
   })
 
   if (response.status === 429) {
-    throw new OpenFoodFactsClientError('Open Food Facts is temporarily busy. Please try again shortly.', 503, true)
+    throw new OpenFoodFactsClientError(
+      'Open Food Facts is temporarily busy. Please try again shortly.',
+      503,
+      true,
+      retryAfterMs(response),
+    )
   }
 
   if (response.ok === false) {
     const retryable = response.status >= 500
-    throw new OpenFoodFactsClientError('Open Food Facts is unavailable right now.', 503, retryable)
+    throw new OpenFoodFactsClientError(
+      'Open Food Facts is unavailable right now.',
+      503,
+      retryable,
+      retryAfterMs(response),
+    )
   }
 
   const decoded = (await response.json()) as OpenFoodFactsSearchResponse
@@ -237,4 +255,23 @@ function barcodeAliases(value: string | undefined): string[] {
   }
 
   return [barcode]
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const headerValue = response.headers.get('Retry-After')
+  if (headerValue == null) {
+    return undefined
+  }
+
+  const seconds = Number.parseFloat(headerValue)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1000)
+  }
+
+  const timestamp = Date.parse(headerValue)
+  if (Number.isNaN(timestamp)) {
+    return undefined
+  }
+
+  return Math.max(0, timestamp - Date.now())
 }

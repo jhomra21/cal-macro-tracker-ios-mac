@@ -55,7 +55,7 @@ struct EditLogEntryScreen: View {
             brandPrompt: "Brand",
             gramsPrompt: "Grams per serving",
             focusedField: $focusedField,
-            keyboardFields: FoodDraftField.formOrder + [.quantityAmount],
+            trailingKeyboardFields: [.quantityAmount],
             previewTotals: previewTotals
         ) {
             FoodQuantitySection(

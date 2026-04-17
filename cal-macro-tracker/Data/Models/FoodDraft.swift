@@ -8,6 +8,12 @@ enum FoodDraftValidationError: LocalizedError {
     case negativeProtein
     case negativeFat
     case negativeCarbs
+    case negativeSaturatedFat
+    case negativeFiber
+    case negativeSugars
+    case negativeAddedSugars
+    case negativeSodium
+    case negativeCholesterol
     case invalidQuantity
     case gramsPerServingRequiredForGramLogging
 
@@ -27,6 +33,18 @@ enum FoodDraftValidationError: LocalizedError {
             "Fat cannot be negative."
         case .negativeCarbs:
             "Carbs cannot be negative."
+        case .negativeSaturatedFat:
+            "Saturated fat cannot be negative."
+        case .negativeFiber:
+            "Fiber cannot be negative."
+        case .negativeSugars:
+            "Sugars cannot be negative."
+        case .negativeAddedSugars:
+            "Added sugars cannot be negative."
+        case .negativeSodium:
+            "Sodium cannot be negative."
+        case .negativeCholesterol:
+            "Cholesterol cannot be negative."
         case .invalidQuantity:
             "Enter an amount greater than zero."
         case .gramsPerServingRequiredForGramLogging:
@@ -64,6 +82,13 @@ struct FoodDraft: Identifiable, Hashable {
     var proteinPerServing: Double = 0
     var fatPerServing: Double = 0
     var carbsPerServing: Double = 0
+    var saturatedFatPerServing: Double?
+    var fiberPerServing: Double?
+    var sugarsPerServing: Double?
+    var addedSugarsPerServing: Double?
+    var sodiumPerServing: Double?
+    var cholesterolPerServing: Double?
+    var secondaryNutrientBackfillState: SecondaryNutrientBackfillState? = .current
     var saveAsCustomFood: Bool = true
 
     init() {}
@@ -74,6 +99,8 @@ struct FoodDraft: Identifiable, Hashable {
                 name: foodItem.name,
                 brand: foodItem.brand,
                 source: foodItem.sourceKind,
+                secondaryNutrientBackfillState: foodItem.secondaryNutrientBackfillState
+                    ?? SecondaryNutrientBackfillPolicy.inferredState(for: foodItem),
                 barcode: foodItem.barcode,
                 externalProductID: foodItem.externalProductID,
                 sourceName: foodItem.sourceName,
@@ -83,7 +110,13 @@ struct FoodDraft: Identifiable, Hashable {
                 caloriesPerServing: foodItem.caloriesPerServing,
                 proteinPerServing: foodItem.proteinPerServing,
                 fatPerServing: foodItem.fatPerServing,
-                carbsPerServing: foodItem.carbsPerServing
+                carbsPerServing: foodItem.carbsPerServing,
+                saturatedFatPerServing: foodItem.saturatedFatPerServing,
+                fiberPerServing: foodItem.fiberPerServing,
+                sugarsPerServing: foodItem.sugarsPerServing,
+                addedSugarsPerServing: foodItem.addedSugarsPerServing,
+                sodiumPerServing: foodItem.sodiumPerServing,
+                cholesterolPerServing: foodItem.cholesterolPerServing
             ),
             foodItemID: foodItem.id,
             saveAsCustomFood: saveAsCustomFood
@@ -96,13 +129,26 @@ struct FoodDraft: Identifiable, Hashable {
                 name: logEntry.foodName,
                 brand: logEntry.brand,
                 source: logEntry.sourceKind,
+                secondaryNutrientBackfillState: logEntry.secondaryNutrientBackfillState
+                    ?? SecondaryNutrientBackfillPolicy.inferredState(for: logEntry),
+                barcode: logEntry.barcodeOrNil,
+                externalProductID: logEntry.externalProductIDOrNil,
+                sourceName: logEntry.sourceNameOrNil,
+                sourceURL: logEntry.sourceURLOrNil,
                 servingDescription: logEntry.servingDescription,
                 gramsPerServing: logEntry.gramsPerServing,
                 caloriesPerServing: logEntry.caloriesPerServing,
                 proteinPerServing: logEntry.proteinPerServing,
                 fatPerServing: logEntry.fatPerServing,
-                carbsPerServing: logEntry.carbsPerServing
+                carbsPerServing: logEntry.carbsPerServing,
+                saturatedFatPerServing: logEntry.saturatedFatPerServing,
+                fiberPerServing: logEntry.fiberPerServing,
+                sugarsPerServing: logEntry.sugarsPerServing,
+                addedSugarsPerServing: logEntry.addedSugarsPerServing,
+                sodiumPerServing: logEntry.sodiumPerServing,
+                cholesterolPerServing: logEntry.cholesterolPerServing
             ),
+            foodItemID: logEntry.foodItemID,
             saveAsCustomFood: saveAsCustomFood
         )
     }
@@ -117,6 +163,7 @@ struct FoodDraft: Identifiable, Hashable {
         self.name = importedData.name
         self.brand = importedData.brand ?? ""
         self.source = importedData.source
+        self.secondaryNutrientBackfillState = importedData.secondaryNutrientBackfillState
         self.barcode = importedData.barcode ?? ""
         self.externalProductID = importedData.externalProductID ?? ""
         self.sourceName = importedData.sourceName ?? ""
@@ -127,6 +174,12 @@ struct FoodDraft: Identifiable, Hashable {
         self.proteinPerServing = importedData.proteinPerServing
         self.fatPerServing = importedData.fatPerServing
         self.carbsPerServing = importedData.carbsPerServing
+        self.saturatedFatPerServing = importedData.saturatedFatPerServing
+        self.fiberPerServing = importedData.fiberPerServing
+        self.sugarsPerServing = importedData.sugarsPerServing
+        self.addedSugarsPerServing = importedData.addedSugarsPerServing
+        self.sodiumPerServing = importedData.sodiumPerServing
+        self.cholesterolPerServing = importedData.cholesterolPerServing
         self.saveAsCustomFood = saveAsCustomFood
     }
 
@@ -171,6 +224,19 @@ struct FoodDraft: Identifiable, Hashable {
             || normalizedDraft.proteinPerServing != normalizedOther.proteinPerServing
             || normalizedDraft.fatPerServing != normalizedOther.fatPerServing
             || normalizedDraft.carbsPerServing != normalizedOther.carbsPerServing
+            || normalizedDraft.hasSecondaryNutrientChanges(comparedTo: normalizedOther)
+    }
+
+    func hasSecondaryNutrientChanges(comparedTo other: FoodDraft) -> Bool {
+        let normalizedDraft = normalized()
+        let normalizedOther = other.normalized()
+
+        return normalizedDraft.saturatedFatPerServing != normalizedOther.saturatedFatPerServing
+            || normalizedDraft.fiberPerServing != normalizedOther.fiberPerServing
+            || normalizedDraft.sugarsPerServing != normalizedOther.sugarsPerServing
+            || normalizedDraft.addedSugarsPerServing != normalizedOther.addedSugarsPerServing
+            || normalizedDraft.sodiumPerServing != normalizedOther.sodiumPerServing
+            || normalizedDraft.cholesterolPerServing != normalizedOther.cholesterolPerServing
     }
 
     static func reusableFoodPersistenceMode(initialDraft: FoodDraft, currentDraft: FoodDraft) -> ReusableFoodPersistenceMode {
@@ -230,6 +296,30 @@ struct FoodDraft: Identifiable, Hashable {
             return .negativeCarbs
         }
 
+        if let saturatedFatPerServing = draft.saturatedFatPerServing, saturatedFatPerServing < 0 {
+            return .negativeSaturatedFat
+        }
+
+        if let fiberPerServing = draft.fiberPerServing, fiberPerServing < 0 {
+            return .negativeFiber
+        }
+
+        if let sugarsPerServing = draft.sugarsPerServing, sugarsPerServing < 0 {
+            return .negativeSugars
+        }
+
+        if let addedSugarsPerServing = draft.addedSugarsPerServing, addedSugarsPerServing < 0 {
+            return .negativeAddedSugars
+        }
+
+        if let sodiumPerServing = draft.sodiumPerServing, sodiumPerServing < 0 {
+            return .negativeSodium
+        }
+
+        if let cholesterolPerServing = draft.cholesterolPerServing, cholesterolPerServing < 0 {
+            return .negativeCholesterol
+        }
+
         return nil
     }
 
@@ -277,8 +367,26 @@ struct FoodDraft: Identifiable, Hashable {
             caloriesPerServing: draft.caloriesPerServing,
             proteinPerServing: draft.proteinPerServing,
             fatPerServing: draft.fatPerServing,
-            carbsPerServing: draft.carbsPerServing
+            carbsPerServing: draft.carbsPerServing,
+            saturatedFatPerServing: draft.saturatedFatPerServing,
+            fiberPerServing: draft.fiberPerServing,
+            sugarsPerServing: draft.sugarsPerServing,
+            addedSugarsPerServing: draft.addedSugarsPerServing,
+            sodiumPerServing: draft.sodiumPerServing,
+            cholesterolPerServing: draft.cholesterolPerServing,
+            secondaryNutrientBackfillState: draft.secondaryNutrientBackfillState
         )
+    }
+
+    func withSecondaryNutrients(from other: FoodDraft) -> FoodDraft {
+        var draft = self
+        draft.saturatedFatPerServing = other.saturatedFatPerServing
+        draft.fiberPerServing = other.fiberPerServing
+        draft.sugarsPerServing = other.sugarsPerServing
+        draft.addedSugarsPerServing = other.addedSugarsPerServing
+        draft.sodiumPerServing = other.sodiumPerServing
+        draft.cholesterolPerServing = other.cholesterolPerServing
+        return draft
     }
 
     private static func trimmedText(from value: String) -> String? {

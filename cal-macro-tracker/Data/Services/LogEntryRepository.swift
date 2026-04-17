@@ -3,6 +3,38 @@ import SwiftData
 
 @MainActor
 struct LogEntryRepository {
+    private struct EditedEntryResolution {
+        let draft: FoodDraft
+        let secondaryNutrientBackfillState: SecondaryNutrientBackfillState?
+    }
+
+    private struct EntryValues {
+        let foodItemID: UUID?
+        let foodName: String
+        let brand: String?
+        let source: FoodSource
+        let barcode: String?
+        let externalProductID: String?
+        let sourceName: String?
+        let sourceURL: String?
+        let servingDescription: String
+        let gramsPerServing: Double?
+        let caloriesPerServing: Double
+        let proteinPerServing: Double
+        let fatPerServing: Double
+        let carbsPerServing: Double
+        let saturatedFatPerServing: Double?
+        let fiberPerServing: Double?
+        let sugarsPerServing: Double?
+        let addedSugarsPerServing: Double?
+        let sodiumPerServing: Double?
+        let cholesterolPerServing: Double?
+        let quantityMode: QuantityMode
+        let servingsConsumed: Double?
+        let gramsConsumed: Double?
+        let consumedNutrients: LoggedFoodNutrients
+    }
+
     let modelContext: ModelContext
 
     func saveEdits(entry: LogEntry, draft: FoodDraft, quantityMode: QuantityMode, quantityAmount: Double, operation: String) throws {
@@ -19,10 +51,16 @@ struct LogEntryRepository {
                     domain: "LogEntryRepository", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to load log entry for saving."])
             }
 
+            let editedEntryResolution = resolvedEditedEntry(
+                from: normalizedDraft,
+                entry: isolatedEntry
+            )
+
             apply(
-                draft: normalizedDraft,
+                draft: editedEntryResolution.draft,
                 quantityMode: quantityMode,
                 quantityAmount: quantityAmount,
+                secondaryNutrientBackfillState: editedEntryResolution.secondaryNutrientBackfillState,
                 to: isolatedEntry
             )
         }
@@ -74,17 +112,17 @@ struct LogEntryRepository {
         }
 
         try PersistenceReporter.persist(in: modelContext.container, operation: operation) { isolatedContext in
-            let foodRepository = FoodItemRepository(modelContext: isolatedContext)
-            let storedFood =
-                reusableFoodPersistenceMode.shouldPersistReusableFood
-                ? try foodRepository.upsertReusableFood(from: normalizedDraft, in: isolatedContext)
-                : nil
+            let resolvedDraft = try resolvedLoggedFoodDraft(
+                from: normalizedDraft,
+                reusableFoodPersistenceMode: reusableFoodPersistenceMode,
+                in: isolatedContext
+            )
             let entry = makeLogEntry(
-                draft: normalizedDraft,
-                storedFood: storedFood,
+                draft: resolvedDraft,
                 loggedAt: loggedAt,
                 quantityMode: quantityMode,
-                quantityAmount: quantityAmount
+                quantityAmount: quantityAmount,
+                secondaryNutrientBackfillState: SecondaryNutrientBackfillPolicy.resolvedStateForNewRecord(from: resolvedDraft)
             )
 
             isolatedContext.insert(entry)
@@ -93,54 +131,176 @@ struct LogEntryRepository {
         WidgetTimelineReloader.reloadDailyMacroWidget()
     }
 
-    private func apply(draft: FoodDraft, quantityMode: QuantityMode, quantityAmount: Double, to entry: LogEntry) {
-        let consumedNutrition = NutritionMath.consumedNutrition(for: draft, mode: quantityMode, amount: quantityAmount)
+    private func apply(
+        draft: FoodDraft,
+        quantityMode: QuantityMode,
+        quantityAmount: Double,
+        secondaryNutrientBackfillState: SecondaryNutrientBackfillState?,
+        to entry: LogEntry
+    ) {
+        let values = resolvedEntryValues(
+            from: draft,
+            quantityMode: quantityMode,
+            quantityAmount: quantityAmount
+        )
 
-        entry.foodName = draft.name
-        entry.brand = draft.brandOrNil
-        entry.servingDescription = draft.servingDescription
-        entry.gramsPerServing = draft.gramsPerServing
-        entry.caloriesPerServing = draft.caloriesPerServing
-        entry.proteinPerServing = draft.proteinPerServing
-        entry.fatPerServing = draft.fatPerServing
-        entry.carbsPerServing = draft.carbsPerServing
-        entry.quantityMode = quantityMode.rawValue
-        entry.servingsConsumed = quantityMode == .servings ? quantityAmount : nil
-        entry.gramsConsumed = quantityMode == .grams ? quantityAmount : nil
-        entry.caloriesConsumed = consumedNutrition.calories
-        entry.proteinConsumed = consumedNutrition.protein
-        entry.fatConsumed = consumedNutrition.fat
-        entry.carbsConsumed = consumedNutrition.carbs
+        entry.foodName = values.foodName
+        entry.brand = values.brand
+        entry.source = values.source.rawValue
+        entry.foodItemID = values.foodItemID
+        entry.barcode = values.barcode
+        entry.externalProductID = values.externalProductID
+        entry.sourceName = values.sourceName
+        entry.sourceURL = values.sourceURL
+        entry.servingDescription = values.servingDescription
+        entry.gramsPerServing = values.gramsPerServing
+        entry.caloriesPerServing = values.caloriesPerServing
+        entry.proteinPerServing = values.proteinPerServing
+        entry.fatPerServing = values.fatPerServing
+        entry.carbsPerServing = values.carbsPerServing
+        entry.saturatedFatPerServing = values.saturatedFatPerServing
+        entry.fiberPerServing = values.fiberPerServing
+        entry.sugarsPerServing = values.sugarsPerServing
+        entry.addedSugarsPerServing = values.addedSugarsPerServing
+        entry.sodiumPerServing = values.sodiumPerServing
+        entry.cholesterolPerServing = values.cholesterolPerServing
+        entry.quantityMode = values.quantityMode.rawValue
+        entry.servingsConsumed = values.servingsConsumed
+        entry.gramsConsumed = values.gramsConsumed
+        entry.caloriesConsumed = values.consumedNutrients.calories
+        entry.proteinConsumed = values.consumedNutrients.protein
+        entry.fatConsumed = values.consumedNutrients.fat
+        entry.carbsConsumed = values.consumedNutrients.carbs
+        entry.saturatedFatConsumed = values.consumedNutrients.saturatedFat
+        entry.fiberConsumed = values.consumedNutrients.fiber
+        entry.sugarsConsumed = values.consumedNutrients.sugars
+        entry.addedSugarsConsumed = values.consumedNutrients.addedSugars
+        entry.sodiumConsumed = values.consumedNutrients.sodium
+        entry.cholesterolConsumed = values.consumedNutrients.cholesterol
+        entry.secondaryNutrientBackfillState = secondaryNutrientBackfillState
         entry.updatedAt = .now
     }
 
     private func makeLogEntry(
         draft: FoodDraft,
-        storedFood: FoodItem?,
         loggedAt: Date,
         quantityMode: QuantityMode,
-        quantityAmount: Double
+        quantityAmount: Double,
+        secondaryNutrientBackfillState: SecondaryNutrientBackfillState?
     ) -> LogEntry {
-        let consumedNutrition = NutritionMath.consumedNutrition(for: draft, mode: quantityMode, amount: quantityAmount)
+        let values = resolvedEntryValues(
+            from: draft,
+            quantityMode: quantityMode,
+            quantityAmount: quantityAmount
+        )
 
         return LogEntry(
+            foodItemID: values.foodItemID,
             dateLogged: loggedAt,
-            foodName: storedFood?.name ?? draft.name,
-            brand: storedFood?.brand ?? draft.brandOrNil,
-            source: storedFood?.sourceKind ?? draft.source,
-            servingDescription: storedFood?.servingDescription ?? draft.servingDescription,
-            gramsPerServing: storedFood?.gramsPerServing ?? draft.gramsPerServing,
-            caloriesPerServing: storedFood?.caloriesPerServing ?? draft.caloriesPerServing,
-            proteinPerServing: storedFood?.proteinPerServing ?? draft.proteinPerServing,
-            fatPerServing: storedFood?.fatPerServing ?? draft.fatPerServing,
-            carbsPerServing: storedFood?.carbsPerServing ?? draft.carbsPerServing,
+            foodName: values.foodName,
+            brand: values.brand,
+            source: values.source,
+            barcode: values.barcode,
+            externalProductID: values.externalProductID,
+            sourceName: values.sourceName,
+            sourceURL: values.sourceURL,
+            servingDescription: values.servingDescription,
+            gramsPerServing: values.gramsPerServing,
+            caloriesPerServing: values.caloriesPerServing,
+            proteinPerServing: values.proteinPerServing,
+            fatPerServing: values.fatPerServing,
+            carbsPerServing: values.carbsPerServing,
+            saturatedFatPerServing: values.saturatedFatPerServing,
+            fiberPerServing: values.fiberPerServing,
+            sugarsPerServing: values.sugarsPerServing,
+            addedSugarsPerServing: values.addedSugarsPerServing,
+            sodiumPerServing: values.sodiumPerServing,
+            cholesterolPerServing: values.cholesterolPerServing,
+            quantityMode: values.quantityMode,
+            servingsConsumed: values.servingsConsumed,
+            gramsConsumed: values.gramsConsumed,
+            caloriesConsumed: values.consumedNutrients.calories,
+            proteinConsumed: values.consumedNutrients.protein,
+            fatConsumed: values.consumedNutrients.fat,
+            carbsConsumed: values.consumedNutrients.carbs,
+            saturatedFatConsumed: values.consumedNutrients.saturatedFat,
+            fiberConsumed: values.consumedNutrients.fiber,
+            sugarsConsumed: values.consumedNutrients.sugars,
+            addedSugarsConsumed: values.consumedNutrients.addedSugars,
+            sodiumConsumed: values.consumedNutrients.sodium,
+            cholesterolConsumed: values.consumedNutrients.cholesterol,
+            secondaryNutrientBackfillState: secondaryNutrientBackfillState
+        )
+    }
+
+    private func resolvedLoggedFoodDraft(
+        from draft: FoodDraft,
+        reusableFoodPersistenceMode: ReusableFoodPersistenceMode,
+        in context: ModelContext
+    ) throws -> FoodDraft {
+        guard reusableFoodPersistenceMode.shouldPersistReusableFood else {
+            return draft
+        }
+
+        let storedFood = try FoodItemRepository(modelContext: context).upsertReusableFood(from: draft, in: context)
+        return FoodDraft(foodItem: storedFood, saveAsCustomFood: draft.saveAsCustomFood)
+    }
+
+    private func resolvedEditedEntry(from draft: FoodDraft, entry: LogEntry) -> EditedEntryResolution {
+        let initialDraft = FoodDraft(logEntry: entry, saveAsCustomFood: false)
+        let hasMeaningfulChanges = draft.hasMeaningfulChanges(comparedTo: initialDraft)
+        let baselineState =
+            entry.secondaryNutrientBackfillState
+            ?? SecondaryNutrientBackfillPolicy.inferredState(for: entry)
+        let secondaryNutrientUpdate = SecondaryNutrientBackfillPolicy.resolvedUpdate(
+            initialDraft: initialDraft,
+            updatedDraft: draft,
+            initialState: baselineState
+        )
+
+        var editedDraft = secondaryNutrientUpdate.draft
+        if initialDraft.foodItemID != nil, hasMeaningfulChanges {
+            editedDraft.foodItemID = nil
+        }
+
+        return EditedEntryResolution(
+            draft: editedDraft,
+            secondaryNutrientBackfillState: secondaryNutrientUpdate.state
+        )
+    }
+
+    private func resolvedEntryValues(
+        from draft: FoodDraft,
+        quantityMode: QuantityMode,
+        quantityAmount: Double
+    ) -> EntryValues {
+        let consumedNutrients = NutritionMath.consumedNutrients(for: draft, mode: quantityMode, amount: quantityAmount)
+
+        return EntryValues(
+            foodItemID: draft.foodItemID,
+            foodName: draft.name,
+            brand: draft.brandOrNil,
+            source: draft.source,
+            barcode: draft.barcodeOrNil,
+            externalProductID: draft.externalProductIDOrNil,
+            sourceName: draft.sourceNameOrNil,
+            sourceURL: draft.sourceURLOrNil,
+            servingDescription: draft.servingDescription,
+            gramsPerServing: draft.gramsPerServing,
+            caloriesPerServing: draft.caloriesPerServing,
+            proteinPerServing: draft.proteinPerServing,
+            fatPerServing: draft.fatPerServing,
+            carbsPerServing: draft.carbsPerServing,
+            saturatedFatPerServing: draft.saturatedFatPerServing,
+            fiberPerServing: draft.fiberPerServing,
+            sugarsPerServing: draft.sugarsPerServing,
+            addedSugarsPerServing: draft.addedSugarsPerServing,
+            sodiumPerServing: draft.sodiumPerServing,
+            cholesterolPerServing: draft.cholesterolPerServing,
             quantityMode: quantityMode,
             servingsConsumed: quantityMode == .servings ? quantityAmount : nil,
             gramsConsumed: quantityMode == .grams ? quantityAmount : nil,
-            caloriesConsumed: consumedNutrition.calories,
-            proteinConsumed: consumedNutrition.protein,
-            fatConsumed: consumedNutrition.fat,
-            carbsConsumed: consumedNutrition.carbs
+            consumedNutrients: consumedNutrients
         )
     }
 }

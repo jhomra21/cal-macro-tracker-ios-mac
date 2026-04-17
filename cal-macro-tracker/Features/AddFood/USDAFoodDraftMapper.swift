@@ -16,7 +16,13 @@ enum USDAFoodDraftMapper {
                 caloriesPerServing: food.caloriesPerServing,
                 proteinPerServing: food.proteinPerServing,
                 fatPerServing: food.fatPerServing,
-                carbsPerServing: food.carbsPerServing
+                carbsPerServing: food.carbsPerServing,
+                saturatedFatPerServing: food.saturatedFatPerServing,
+                fiberPerServing: food.fiberPerServing,
+                sugarsPerServing: food.sugarsPerServing,
+                addedSugarsPerServing: food.addedSugarsPerServing,
+                sodiumPerServing: food.sodiumPerServing,
+                cholesterolPerServing: food.cholesterolPerServing
             )
         )
     }

@@ -1,9 +1,22 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { OpenFoodFactsClientError } from './openFoodFacts'
+import {
+  buildCacheKey,
+  cacheReadOrder,
+  cacheWritePlan,
+  shouldWarmOpenFoodFactsCache,
+} from './packagedFoodSearchCache'
+import type { PackagedFoodCacheKeyKind } from './packagedFoodSearchCache'
 import { searchPackagedFoods } from './packagedFoods'
-import type { SearchProvider, USDAProxyErrorResponse } from './types'
-import { USDAClientError, searchUSDAFoods } from './usda'
+import type { PackagedFoodSearchExecution } from './packagedFoods'
+import type {
+  PackagedFoodSearchQuery,
+  PackagedFoodSearchResponse,
+  SearchProvider,
+  USDAProxyErrorResponse,
+} from './types'
+import { fetchUSDAFood, USDAClientError, searchUSDAFoods } from './usda'
 
 const app = new Hono<{ Bindings: Env }>()
 const CACHE_TTL_SECONDS = 300
@@ -13,6 +26,20 @@ const MIN_QUERY_LENGTH = 2
 const SEARCH_QUERY_KEYS = new Set(['q', 'page', 'pageSize'])
 const PACKAGED_SEARCH_QUERY_KEYS = new Set([...SEARCH_QUERY_KEYS, 'fallbackOnEmpty', 'provider'])
 
+interface PackagedFoodSearchLogContext {
+  page: number
+  pageSize: number
+  provider: SearchProvider | 'default'
+}
+
+interface PackagedFoodSearchLogMetadata {
+  cacheKey?: PackagedFoodCacheKeyKind
+  openFoodFactsAttemptCount?: number
+  resolvedProvider?: SearchProvider
+  degradedFallbackReason?: PackagedFoodSearchExecution['degradedFallbackReason']
+  errorMessage?: string
+}
+
 app.get('/v1/packaged-foods/search', async (c) => {
   const params = parseSearchParams(c, PACKAGED_SEARCH_QUERY_KEYS, true)
   if (params instanceof Response) {
@@ -20,23 +47,56 @@ app.get('/v1/packaged-foods/search', async (c) => {
   }
 
   const cache = await caches.open('usda-proxy')
-  const cacheKey = buildCacheKey(new URL(c.req.url), '/v1/packaged-foods/search', [
-    ['q', params.query.toLowerCase()],
-    ['page', String(params.page)],
-    ['pageSize', String(params.pageSize)],
-    ['fallbackOnEmpty', params.fallbackOnEmpty ? '1' : '0'],
-    ['provider', params.provider ?? ''],
-  ])
-  const cachedResponse = await cache.match(cacheKey)
-  if (cachedResponse != null) {
-    return cachedResponse
+  const requestURL = new URL(c.req.url)
+  const logContext = packagedFoodSearchLogContext(params)
+
+  for (const cacheKey of cacheReadOrder(requestURL, params)) {
+    const cachedResponse = await cache.match(cacheKey.request)
+    if (cachedResponse != null) {
+      logPackagedFoodSearch('cache-hit', logContext, {
+        cacheKey: cacheKey.kind,
+      })
+      return cachedResponse
+    }
   }
 
   try {
-    const response = await searchPackagedFoods(params, c.env.USDA_API_KEY)
-    const jsonResponse = c.json(response)
-    jsonResponse.headers.set('Cache-Control', `public, s-maxage=${CACHE_TTL_SECONDS}`)
-    c.executionCtx.waitUntil(cache.put(cacheKey, jsonResponse.clone()))
+    const response = await searchPackagedFoods(
+      params,
+      c.env.USDA_API_KEY,
+      c.env.OPEN_FOOD_FACTS_USER_AGENT,
+    )
+
+    logPackagedFoodSearch('cache-miss', logContext, {
+      openFoodFactsAttemptCount: response.openFoodFactsAttemptCount,
+      resolvedProvider: response.resolvedProvider,
+      degradedFallbackReason: response.degradedFallbackReason,
+    })
+
+    const cacheWrites = cacheWritePlan(requestURL, params, response)
+    const jsonResponse = cachedJSONResponse(publicPackagedFoodResponse(response))
+
+    if (cacheWrites.length > 0) {
+      c.executionCtx.waitUntil(
+        Promise.all(
+          cacheWrites.map((cacheKey) => cache.put(cacheKey.request, jsonResponse.clone())),
+        ),
+      )
+    }
+
+    if (shouldWarmOpenFoodFactsCache(params, response)) {
+      c.executionCtx.waitUntil(
+        warmOpenFoodFactsCache(
+          cache,
+          requestURL,
+          params,
+          logContext,
+          c.env.USDA_API_KEY,
+          c.env.OPEN_FOOD_FACTS_USER_AGENT,
+        ),
+      )
+    }
+
     return jsonResponse
   } catch (error) {
     return handleSearchError(error, 'Packaged food search is unavailable right now.')
@@ -68,6 +128,30 @@ app.get('/v1/usda/search', async (c) => {
     return jsonResponse
   } catch (error) {
     return handleSearchError(error, 'USDA search is unavailable right now.')
+  }
+})
+
+app.get('/v1/usda/foods/:fdcId', async (c) => {
+  const fdcId = parsePositiveInt(c.req.param('fdcId'))
+  if (fdcId == null) {
+    return jsonError(c, 'fdcId must be a positive integer.', 400)
+  }
+
+  const cache = await caches.open('usda-proxy')
+  const cacheKey = buildCacheKey(new URL(c.req.url), `/v1/usda/foods/${fdcId}`, [])
+  const cachedResponse = await cache.match(cacheKey)
+  if (cachedResponse != null) {
+    return cachedResponse
+  }
+
+  try {
+    const response = await fetchUSDAFood(fdcId, c.env.USDA_API_KEY)
+    const jsonResponse = c.json(response)
+    jsonResponse.headers.set('Cache-Control', `public, s-maxage=${CACHE_TTL_SECONDS}`)
+    c.executionCtx.waitUntil(cache.put(cacheKey, jsonResponse.clone()))
+    return jsonResponse
+  } catch (error) {
+    return handleSearchError(error, 'USDA food details are unavailable right now.')
   }
 })
 
@@ -129,6 +213,15 @@ function parseBoundedPositiveInt(value: string, max: number): number | null {
   return Number.isInteger(parsed) && parsed > 0 && parsed <= max ? parsed : null
 }
 
+function parsePositiveInt(value: string): number | null {
+  if (/^\d+$/.test(value) === false) {
+    return null
+  }
+
+  const parsed = Number.parseInt(value, 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
 function parseBooleanFlag(value: string): boolean | null {
   if (value === '1' || value.toLowerCase() === 'true') {
     return true
@@ -153,13 +246,103 @@ function parseSearchProvider(value: string | undefined): SearchProvider | undefi
   return undefined
 }
 
-function buildCacheKey(url: URL, path: string, queryItems: Array<[string, string]>): Request {
-  const cacheURL = new URL(url.origin)
-  cacheURL.pathname = path
-  for (const [key, value] of queryItems) {
-    cacheURL.searchParams.set(key, value)
+function cachedJSONResponse<T>(body: T): Response {
+  const response = new Response(JSON.stringify(body), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+    },
+  })
+  response.headers.set('Cache-Control', `public, s-maxage=${CACHE_TTL_SECONDS}`)
+  return response
+}
+
+function publicPackagedFoodResponse(response: PackagedFoodSearchExecution): PackagedFoodSearchResponse {
+  return {
+    query: response.query,
+    page: response.page,
+    pageSize: response.pageSize,
+    resolvedProvider: response.resolvedProvider,
+    results: response.results,
+    hasMore: response.hasMore,
   }
-  return new Request(cacheURL.toString(), { method: 'GET' })
+}
+
+async function warmOpenFoodFactsCache(
+  cache: Cache,
+  requestURL: URL,
+  params: PackagedFoodSearchQuery,
+  logContext: PackagedFoodSearchLogContext,
+  apiKey: string,
+  openFoodFactsUserAgent: string,
+): Promise<void> {
+  const openFoodFactsParams = {
+    ...params,
+    provider: 'openFoodFacts' as const,
+    fallbackOnEmpty: false,
+  }
+
+  try {
+    const response = await searchPackagedFoods(
+      openFoodFactsParams,
+      apiKey,
+      openFoodFactsUserAgent,
+    )
+
+    if (response.resolvedProvider !== 'openFoodFacts' || response.results.length === 0) {
+      return
+    }
+
+    const cacheWrites = cacheWritePlan(
+      requestURL,
+      openFoodFactsParams,
+      response,
+    )
+    if (cacheWrites.length === 0) {
+      return
+    }
+
+    const cachedResponse = cachedJSONResponse(publicPackagedFoodResponse(response))
+    await Promise.all(cacheWrites.map((cacheKey) => cache.put(cacheKey.request, cachedResponse.clone())))
+    logPackagedFoodSearch('warm-cache-success', logContext, {
+      openFoodFactsAttemptCount: response.openFoodFactsAttemptCount,
+    })
+  } catch (error) {
+    logPackagedFoodSearch('warm-cache-failed', logContext, {
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+}
+
+export function packagedFoodSearchLogContext(
+  params: Pick<PackagedFoodSearchQuery, 'page' | 'pageSize' | 'provider'>,
+): PackagedFoodSearchLogContext {
+  return {
+    page: params.page,
+    pageSize: params.pageSize,
+    provider: params.provider ?? 'default',
+  }
+}
+
+export function packagedFoodSearchLogEntry(
+  phase: string,
+  context: PackagedFoodSearchLogContext,
+  metadata: PackagedFoodSearchLogMetadata = {},
+) {
+  return {
+    phase,
+    page: context.page,
+    pageSize: context.pageSize,
+    provider: context.provider,
+    ...metadata,
+  }
+}
+
+function logPackagedFoodSearch(
+  phase: string,
+  context: PackagedFoodSearchLogContext,
+  metadata: PackagedFoodSearchLogMetadata = {},
+): void {
+  console.info(JSON.stringify(packagedFoodSearchLogEntry(phase, context, metadata)))
 }
 
 function handleSearchError(error: unknown, fallbackMessage: string) {

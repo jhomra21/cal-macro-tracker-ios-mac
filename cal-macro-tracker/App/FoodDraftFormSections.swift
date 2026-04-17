@@ -9,9 +9,15 @@ enum FoodDraftField: Hashable {
     case protein
     case fat
     case carbs
+    case saturatedFat
+    case fiber
+    case sugars
+    case addedSugars
+    case sodium
+    case cholesterol
     case quantityAmount
 
-    static let formOrder: [FoodDraftField] = [
+    static let baseFormOrder: [FoodDraftField] = [
         .name,
         .brand,
         .servingDescription,
@@ -21,6 +27,26 @@ enum FoodDraftField: Hashable {
         .fat,
         .carbs
     ]
+
+    static let additionalNutritionFields: [FoodDraftField] = [
+        .saturatedFat,
+        .fiber,
+        .sugars,
+        .addedSugars,
+        .sodium,
+        .cholesterol
+    ]
+
+    static func editorFormOrder(
+        includingAdditionalNutrition: Bool,
+        trailingFields: [FoodDraftField] = []
+    ) -> [FoodDraftField] {
+        baseFormOrder + (includingAdditionalNutrition ? additionalNutritionFields : []) + trailingFields
+    }
+
+    var isAdditionalNutritionField: Bool {
+        Self.additionalNutritionFields.contains(self)
+    }
 }
 
 @MainActor
@@ -30,6 +56,12 @@ struct FoodDraftNumericText: Equatable {
     var protein: String
     var fat: String
     var carbs: String
+    var saturatedFat: String
+    var fiber: String
+    var sugars: String
+    var addedSugars: String
+    var sodium: String
+    var cholesterol: String
 
     init(draft: FoodDraft) {
         gramsPerServing = NumericText.editingDisplay(for: draft.gramsPerServing)
@@ -37,10 +69,21 @@ struct FoodDraftNumericText: Equatable {
         protein = NumericText.editingDisplay(for: draft.proteinPerServing, emptyWhenZero: true)
         fat = NumericText.editingDisplay(for: draft.fatPerServing, emptyWhenZero: true)
         carbs = NumericText.editingDisplay(for: draft.carbsPerServing, emptyWhenZero: true)
+        saturatedFat = NumericText.editingDisplay(for: draft.saturatedFatPerServing)
+        fiber = NumericText.editingDisplay(for: draft.fiberPerServing)
+        sugars = NumericText.editingDisplay(for: draft.sugarsPerServing)
+        addedSugars = NumericText.editingDisplay(for: draft.addedSugarsPerServing)
+        sodium = NumericText.editingDisplay(for: draft.sodiumPerServing)
+        cholesterol = NumericText.editingDisplay(for: draft.cholesterolPerServing)
     }
 
     var hasInvalidValues: Bool {
-        [gramsPerServing, calories, protein, fat, carbs]
+        [gramsPerServing, calories, protein, fat, carbs, saturatedFat, fiber, sugars, addedSugars, sodium, cholesterol]
+            .contains { NumericText.state(for: $0).isInvalid }
+    }
+
+    var hasInvalidAdditionalNutritionValues: Bool {
+        [saturatedFat, fiber, sugars, addedSugars, sodium, cholesterol]
             .contains { NumericText.state(for: $0).isInvalid }
     }
 
@@ -51,6 +94,12 @@ struct FoodDraftNumericText: Equatable {
         editingDraft.proteinPerServing = numericValue(from: protein)
         editingDraft.fatPerServing = numericValue(from: fat)
         editingDraft.carbsPerServing = numericValue(from: carbs)
+        editingDraft.saturatedFatPerServing = optionalValue(from: saturatedFat)
+        editingDraft.fiberPerServing = optionalValue(from: fiber)
+        editingDraft.sugarsPerServing = optionalValue(from: sugars)
+        editingDraft.addedSugarsPerServing = optionalValue(from: addedSugars)
+        editingDraft.sodiumPerServing = optionalValue(from: sodium)
+        editingDraft.cholesterolPerServing = optionalValue(from: cholesterol)
         return editingDraft
     }
 
@@ -83,6 +132,7 @@ struct FoodDraftFormSections: View {
     let brandPrompt: String
     let gramsPrompt: String
     let focusedField: FocusState<FoodDraftField?>.Binding
+    @Binding var showsAdditionalNutrition: Bool
     @Binding private var numericText: FoodDraftNumericText
 
     init(
@@ -90,12 +140,14 @@ struct FoodDraftFormSections: View {
         numericText: Binding<FoodDraftNumericText>,
         brandPrompt: String,
         gramsPrompt: String,
+        showsAdditionalNutrition: Binding<Bool>,
         focusedField: FocusState<FoodDraftField?>.Binding
     ) {
         _draft = draft
         _numericText = numericText
         self.brandPrompt = brandPrompt
         self.gramsPrompt = gramsPrompt
+        _showsAdditionalNutrition = showsAdditionalNutrition
         self.focusedField = focusedField
     }
 
@@ -121,8 +173,59 @@ struct FoodDraftFormSections: View {
                 nutrientField(title: "Protein", suffix: "g", field: .protein, text: numericBinding(\.protein))
                 nutrientField(title: "Fat", suffix: "g", field: .fat, text: numericBinding(\.fat))
                 nutrientField(title: "Carbs", suffix: "g", field: .carbs, text: numericBinding(\.carbs))
+                additionalNutritionToggle
+
+                if showsVisibleAdditionalNutrition {
+                    nutrientField(
+                        title: "Saturated Fat",
+                        suffix: "g",
+                        field: .saturatedFat,
+                        text: numericBinding(\.saturatedFat)
+                    )
+                    nutrientField(title: "Fiber", suffix: "g", field: .fiber, text: numericBinding(\.fiber))
+                    nutrientField(title: "Sugars", suffix: "g", field: .sugars, text: numericBinding(\.sugars))
+                    nutrientField(
+                        title: "Added Sugars",
+                        suffix: "g",
+                        field: .addedSugars,
+                        text: numericBinding(\.addedSugars)
+                    )
+                    nutrientField(title: "Sodium", suffix: "mg", field: .sodium, text: numericBinding(\.sodium))
+                    nutrientField(
+                        title: "Cholesterol",
+                        suffix: "mg",
+                        field: .cholesterol,
+                        text: numericBinding(\.cholesterol)
+                    )
+                }
             }
         }
+    }
+
+    private var additionalNutritionToggle: some View {
+        Button {
+            if showsVisibleAdditionalNutrition {
+                guard requiresAdditionalNutritionVisibility == false else { return }
+                showsAdditionalNutrition = false
+            } else {
+                showsAdditionalNutrition = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Text(showsVisibleAdditionalNutrition ? "Show less" : "Show more")
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Image(systemName: showsVisibleAdditionalNutrition ? "chevron.down" : "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(requiresAdditionalNutritionVisibility && showsVisibleAdditionalNutrition)
     }
 
     private func nutrientField(title: String, suffix: String, field: FoodDraftField, text: Binding<String>) -> some View {
@@ -143,5 +246,14 @@ struct FoodDraftFormSections: View {
                 draft = numericText.editingDraft(from: draft)
             }
         )
+    }
+
+    private var showsVisibleAdditionalNutrition: Bool {
+        showsAdditionalNutrition || requiresAdditionalNutritionVisibility
+    }
+
+    private var requiresAdditionalNutritionVisibility: Bool {
+        numericText.hasInvalidAdditionalNutritionValues
+            || focusedField.wrappedValue?.isAdditionalNutritionField == true
     }
 }

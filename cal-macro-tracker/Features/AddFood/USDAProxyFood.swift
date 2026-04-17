@@ -10,6 +10,12 @@ struct USDAProxyFood: Decodable, Identifiable, Hashable {
     let proteinPerServing: Double
     let fatPerServing: Double
     let carbsPerServing: Double
+    let saturatedFatPerServing: Double?
+    let fiberPerServing: Double?
+    let sugarsPerServing: Double?
+    let addedSugarsPerServing: Double?
+    let sodiumPerServing: Double?
+    let cholesterolPerServing: Double?
     let sourceName: String
     let sourceURL: String
     let barcode: String?

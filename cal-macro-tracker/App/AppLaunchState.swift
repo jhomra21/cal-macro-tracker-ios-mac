@@ -1,9 +1,12 @@
+import OSLog
 import SwiftData
 import SwiftUI
 
 @MainActor
 @Observable
 final class AppLaunchState {
+    private static let logger = Logger(subsystem: "juan-test.cal-macro-tracker", category: "AppLaunch")
+
     enum Phase {
         case launching
         case ready(ModelContainer)
@@ -22,6 +25,14 @@ final class AppLaunchState {
             try await AppBootstrap.bootstrapIfNeeded(in: container)
             WidgetTimelineReloader.reloadDailyMacroWidget()
             phase = .ready(container)
+            Task { @MainActor in
+                do {
+                    try await AppBootstrap.repairSecondaryNutrientsIfNeeded(in: container)
+                    WidgetTimelineReloader.reloadDailyMacroWidget()
+                } catch {
+                    Self.logger.error("Secondary nutrient repair failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
         } catch {
             phase = .failed(error.localizedDescription)
         }

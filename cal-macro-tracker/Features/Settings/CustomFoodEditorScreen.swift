@@ -81,7 +81,7 @@ struct ReusableFoodEditorScreen: View {
             brandPrompt: "Brand (optional)",
             gramsPrompt: "Grams per serving (optional)",
             focusedField: $focusedField,
-            keyboardFields: FoodDraftField.formOrder,
+            trailingKeyboardFields: [],
             previewTotals: nil
         ) {
             if draft.sourceNameOrNil != nil || sourceURL != nil {

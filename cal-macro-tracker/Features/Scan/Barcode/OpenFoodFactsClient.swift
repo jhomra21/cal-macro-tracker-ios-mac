@@ -1,52 +1,5 @@
 import Foundation
 
-enum OpenFoodFactsIdentity {
-    nonisolated static func barcodeAliases(for barcode: String?) -> [String] {
-        guard let barcode = trimmedText(from: barcode) else {
-            return []
-        }
-
-        if CharacterSet.decimalDigits.isSuperset(of: CharacterSet(charactersIn: barcode)) {
-            if barcode.count == 12 {
-                return [barcode, "0\(barcode)"]
-            }
-
-            if barcode.count == 13, barcode.hasPrefix("0") {
-                return [String(barcode.dropFirst()), barcode]
-            }
-        }
-
-        return [barcode]
-    }
-
-    nonisolated static func qualifiedExternalProductID(for barcode: String?) -> String? {
-        qualifiedExternalProductID(forRawIdentifier: barcodeAliases(for: barcode).first)
-    }
-
-    nonisolated static func qualifiedExternalProductIDAliases(for barcode: String?) -> [String] {
-        var seen = Set<String>()
-        return barcodeAliases(for: barcode)
-            .compactMap { qualifiedExternalProductID(forRawIdentifier: $0) }
-            .filter { seen.insert($0).inserted }
-    }
-
-    nonisolated static func qualifiedExternalProductID(forRawIdentifier identifier: String?) -> String? {
-        guard let identifier = trimmedText(from: identifier) else {
-            return nil
-        }
-
-        return "openfoodfacts:\(identifier)"
-    }
-
-    nonisolated static func trimmedText(from value: String?) -> String? {
-        guard let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedValue.isEmpty else {
-            return nil
-        }
-
-        return trimmedValue
-    }
-}
-
 struct OpenFoodFactsProduct: Decodable, Identifiable, Hashable {
     let externalProductID: String?
 
@@ -86,20 +39,48 @@ struct OpenFoodFactsProduct: Decodable, Identifiable, Hashable {
         let proteinPerServing: Double?
         let fatPerServing: Double?
         let carbsPerServing: Double?
+        let saturatedFatPerServing: Double?
+        let fiberPerServing: Double?
+        let sugarsPerServing: Double?
+        let addedSugarsPerServing: Double?
+        let sodiumPerServing: Double?
+        let cholesterolPerServing: Double?
+        let saltPerServing: Double?
         let caloriesPer100g: Double?
         let proteinPer100g: Double?
         let fatPer100g: Double?
         let carbsPer100g: Double?
+        let saturatedFatPer100g: Double?
+        let fiberPer100g: Double?
+        let sugarsPer100g: Double?
+        let addedSugarsPer100g: Double?
+        let sodiumPer100g: Double?
+        let cholesterolPer100g: Double?
+        let saltPer100g: Double?
 
         private enum CodingKeys: String, CodingKey {
             case caloriesPerServing = "energy-kcal_serving"
             case proteinPerServing = "proteins_serving"
             case fatPerServing = "fat_serving"
             case carbsPerServing = "carbohydrates_serving"
+            case saturatedFatPerServing = "saturated-fat_serving"
+            case fiberPerServing = "fiber_serving"
+            case sugarsPerServing = "sugars_serving"
+            case addedSugarsPerServing = "added-sugars_serving"
+            case sodiumPerServing = "sodium_serving"
+            case cholesterolPerServing = "cholesterol_serving"
+            case saltPerServing = "salt_serving"
             case caloriesPer100g = "energy-kcal_100g"
             case proteinPer100g = "proteins_100g"
             case fatPer100g = "fat_100g"
             case carbsPer100g = "carbohydrates_100g"
+            case saturatedFatPer100g = "saturated-fat_100g"
+            case fiberPer100g = "fiber_100g"
+            case sugarsPer100g = "sugars_100g"
+            case addedSugarsPer100g = "added-sugars_100g"
+            case sodiumPer100g = "sodium_100g"
+            case cholesterolPer100g = "cholesterol_100g"
+            case saltPer100g = "salt_100g"
         }
 
         static let empty = Self(
@@ -107,10 +88,24 @@ struct OpenFoodFactsProduct: Decodable, Identifiable, Hashable {
             proteinPerServing: nil,
             fatPerServing: nil,
             carbsPerServing: nil,
+            saturatedFatPerServing: nil,
+            fiberPerServing: nil,
+            sugarsPerServing: nil,
+            addedSugarsPerServing: nil,
+            sodiumPerServing: nil,
+            cholesterolPerServing: nil,
+            saltPerServing: nil,
             caloriesPer100g: nil,
             proteinPer100g: nil,
             fatPer100g: nil,
-            carbsPer100g: nil
+            carbsPer100g: nil,
+            saturatedFatPer100g: nil,
+            fiberPer100g: nil,
+            sugarsPer100g: nil,
+            addedSugarsPer100g: nil,
+            sodiumPer100g: nil,
+            cholesterolPer100g: nil,
+            saltPer100g: nil
         )
     }
 
@@ -153,7 +148,7 @@ enum OpenFoodFactsClientError: LocalizedError {
         case .invalidResponse:
             return true
         case let .requestFailed(statusCode):
-            return statusCode >= 500
+            return statusCode == 429 || statusCode >= 500
         }
     }
 

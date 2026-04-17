@@ -7,6 +7,7 @@ enum AppBootstrap {
         let shouldSeedCommonFoods: Bool
         let shouldSeedGoals: Bool
         let shouldRepairReusableFoodSearchIndexes: Bool
+        let shouldRepairSecondaryNutrients: Bool
     }
 
     static func bootstrapIfNeeded(in container: ModelContainer) async throws {
@@ -30,6 +31,19 @@ enum AppBootstrap {
         }
     }
 
+    static func repairSecondaryNutrientsIfNeeded(in container: ModelContainer) async throws {
+        let planningContext = ModelContext(container)
+        let plan = try makePlan(modelContext: planningContext)
+        guard plan.shouldRepairSecondaryNutrients else { return }
+
+        let commonFoodRecords = try await CommonFoodSeedLoader.commonFoodSeedRecords()
+        let writeContext = ModelContext(container)
+        try await SecondaryNutrientRepairService.repairIfNeeded(
+            modelContext: writeContext,
+            commonFoodRecords: commonFoodRecords
+        )
+    }
+
     // periphery:ignore - preview-only bootstrap used by in-memory SwiftUI previews
     static func bootstrapPreview(modelContext: ModelContext) throws {
         try CommonFoodSeedLoader.seedIfNeeded(modelContext: modelContext)
@@ -40,7 +54,8 @@ enum AppBootstrap {
         Plan(
             shouldSeedCommonFoods: try shouldSeedCommonFoods(modelContext: modelContext),
             shouldSeedGoals: try shouldSeedGoals(modelContext: modelContext),
-            shouldRepairReusableFoodSearchIndexes: try shouldRepairReusableFoodSearchIndexes(modelContext: modelContext)
+            shouldRepairReusableFoodSearchIndexes: try shouldRepairReusableFoodSearchIndexes(modelContext: modelContext),
+            shouldRepairSecondaryNutrients: try shouldRepairSecondaryNutrients(modelContext: modelContext)
         )
     }
 
@@ -56,6 +71,10 @@ enum AppBootstrap {
 
     private static func shouldRepairReusableFoodSearchIndexes(modelContext: ModelContext) throws -> Bool {
         try reusableFoodsNeedingSearchIndexRepair(modelContext: modelContext).isEmpty == false
+    }
+
+    private static func shouldRepairSecondaryNutrients(modelContext: ModelContext) throws -> Bool {
+        try SecondaryNutrientRepairService.requiresRepairPass(modelContext: modelContext)
     }
 
     private static func repairReusableFoodSearchIndexesIfNeeded(modelContext: ModelContext) throws {
@@ -74,7 +93,6 @@ enum AppBootstrap {
         let descriptor = FetchDescriptor<FoodItem>(predicate: #Predicate { $0.source != commonSource })
         return try modelContext.fetch(descriptor).filter(\.needsSearchableTextRepair)
     }
-
     private static func seedGoalsIfNeeded(modelContext: ModelContext) throws {
         let descriptor = FetchDescriptor<DailyGoals>()
         let count = try modelContext.fetchCount(descriptor)

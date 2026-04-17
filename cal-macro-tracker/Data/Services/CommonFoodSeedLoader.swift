@@ -10,6 +10,12 @@ struct CommonFoodSeedRecord: Decodable, Sendable {
     let proteinPerServing: Double
     let fatPerServing: Double
     let carbsPerServing: Double
+    let saturatedFatPerServing: Double?
+    let fiberPerServing: Double?
+    let sugarsPerServing: Double?
+    let addedSugarsPerServing: Double?
+    let sodiumPerServing: Double?
+    let cholesterolPerServing: Double?
 }
 
 enum CommonFoodSeedLoader {
@@ -47,19 +53,89 @@ enum CommonFoodSeedLoader {
 
         try PersistenceReporter.persist(modelContext: modelContext, operation: "Seed common foods") {
             foods.forEach { item in
-                let food = FoodItem(
-                    name: item.name,
-                    source: .common,
-                    servingDescription: item.servingDescription,
-                    gramsPerServing: item.gramsPerServing,
-                    caloriesPerServing: item.caloriesPerServing,
-                    proteinPerServing: item.proteinPerServing,
-                    fatPerServing: item.fatPerServing,
-                    carbsPerServing: item.carbsPerServing,
-                    aliases: item.aliases
-                )
+                let food = makeFoodItem(from: item)
                 modelContext.insert(food)
             }
         }
+    }
+
+    static func repairIfNeeded(modelContext: ModelContext, records: [CommonFoodSeedRecord]) throws {
+        let commonFoods = try fetchCommonFoods(modelContext: modelContext)
+        let recordsByName = Dictionary(uniqueKeysWithValues: records.map { ($0.name.lowercased(), $0) })
+        let foodsNeedingRepair = commonFoods.filter { $0.secondaryNutrientBackfillState == .needsRepair }
+        guard foodsNeedingRepair.isEmpty == false else { return }
+
+        try PersistenceReporter.persist(modelContext: modelContext, operation: "Repair common food nutrients") {
+            for food in foodsNeedingRepair {
+                guard let record = recordsByName[food.name.lowercased()] else { continue }
+                apply(record, to: food)
+            }
+        }
+    }
+
+    private static func fetchCommonFoods(modelContext: ModelContext) throws -> [FoodItem] {
+        let commonSource = FoodSource.common.rawValue
+        let descriptor = FetchDescriptor<FoodItem>(predicate: #Predicate { $0.source == commonSource })
+        return try modelContext.fetch(descriptor)
+    }
+
+    private static func makeFoodItem(from record: CommonFoodSeedRecord) -> FoodItem {
+        FoodItem(
+            name: record.name,
+            source: .common,
+            servingDescription: record.servingDescription,
+            gramsPerServing: record.gramsPerServing,
+            caloriesPerServing: record.caloriesPerServing,
+            proteinPerServing: record.proteinPerServing,
+            fatPerServing: record.fatPerServing,
+            carbsPerServing: record.carbsPerServing,
+            saturatedFatPerServing: record.saturatedFatPerServing,
+            fiberPerServing: record.fiberPerServing,
+            sugarsPerServing: record.sugarsPerServing,
+            addedSugarsPerServing: record.addedSugarsPerServing,
+            sodiumPerServing: record.sodiumPerServing,
+            cholesterolPerServing: record.cholesterolPerServing,
+            aliases: record.aliases
+        )
+    }
+
+    static func makeFoodDraft(from record: CommonFoodSeedRecord) -> FoodDraft {
+        FoodDraft(
+            importedData: FoodDraftImportedData(
+                name: record.name,
+                source: .common,
+                servingDescription: record.servingDescription,
+                gramsPerServing: record.gramsPerServing,
+                caloriesPerServing: record.caloriesPerServing,
+                proteinPerServing: record.proteinPerServing,
+                fatPerServing: record.fatPerServing,
+                carbsPerServing: record.carbsPerServing,
+                saturatedFatPerServing: record.saturatedFatPerServing,
+                fiberPerServing: record.fiberPerServing,
+                sugarsPerServing: record.sugarsPerServing,
+                addedSugarsPerServing: record.addedSugarsPerServing,
+                sodiumPerServing: record.sodiumPerServing,
+                cholesterolPerServing: record.cholesterolPerServing
+            ),
+            saveAsCustomFood: false
+        )
+    }
+
+    private static func apply(_ record: CommonFoodSeedRecord, to food: FoodItem) {
+        food.name = record.name
+        food.servingDescription = record.servingDescription
+        food.gramsPerServing = record.gramsPerServing
+        food.caloriesPerServing = record.caloriesPerServing
+        food.proteinPerServing = record.proteinPerServing
+        food.fatPerServing = record.fatPerServing
+        food.carbsPerServing = record.carbsPerServing
+        food.saturatedFatPerServing = record.saturatedFatPerServing
+        food.fiberPerServing = record.fiberPerServing
+        food.sugarsPerServing = record.sugarsPerServing
+        food.addedSugarsPerServing = record.addedSugarsPerServing
+        food.sodiumPerServing = record.sodiumPerServing
+        food.cholesterolPerServing = record.cholesterolPerServing
+        food.secondaryNutrientBackfillState = .current
+        food.updateSearchableText(with: record.aliases)
     }
 }

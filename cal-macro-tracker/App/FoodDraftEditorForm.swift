@@ -7,10 +7,49 @@ struct FoodDraftEditorForm<QuantitySection: View, FooterSections: View>: View {
     let brandPrompt: String
     let gramsPrompt: String
     let focusedField: FocusState<FoodDraftField?>.Binding
-    let keyboardFields: [FoodDraftField]
+    let trailingKeyboardFields: [FoodDraftField]
     let previewTotals: NutritionSnapshot?
     @ViewBuilder let quantitySection: () -> QuantitySection
     @ViewBuilder let footerSections: () -> FooterSections
+    @State private var showsAdditionalNutrition = false
+
+    init(
+        draft: Binding<FoodDraft>,
+        numericText: Binding<FoodDraftNumericText>,
+        errorMessage: Binding<String?>,
+        brandPrompt: String,
+        gramsPrompt: String,
+        focusedField: FocusState<FoodDraftField?>.Binding,
+        trailingKeyboardFields: [FoodDraftField],
+        previewTotals: NutritionSnapshot?,
+        @ViewBuilder quantitySection: @escaping () -> QuantitySection,
+        @ViewBuilder footerSections: @escaping () -> FooterSections
+    ) {
+        _draft = draft
+        _numericText = numericText
+        _errorMessage = errorMessage
+        self.brandPrompt = brandPrompt
+        self.gramsPrompt = gramsPrompt
+        self.focusedField = focusedField
+        self.trailingKeyboardFields = trailingKeyboardFields
+        self.previewTotals = previewTotals
+        self.quantitySection = quantitySection
+        self.footerSections = footerSections
+        _showsAdditionalNutrition = State(initialValue: draft.wrappedValue.isMissingAllSecondaryNutrients == false)
+    }
+
+    private var keyboardFields: [FoodDraftField] {
+        FoodDraftField.editorFormOrder(
+            includingAdditionalNutrition: showsVisibleAdditionalNutrition,
+            trailingFields: trailingKeyboardFields
+        )
+    }
+
+    private var showsVisibleAdditionalNutrition: Bool {
+        showsAdditionalNutrition
+            || numericText.hasInvalidAdditionalNutritionValues
+            || focusedField.wrappedValue?.isAdditionalNutritionField == true
+    }
 
     var body: some View {
         Form {
@@ -19,6 +58,7 @@ struct FoodDraftEditorForm<QuantitySection: View, FooterSections: View>: View {
                 numericText: $numericText,
                 brandPrompt: brandPrompt,
                 gramsPrompt: gramsPrompt,
+                showsAdditionalNutrition: $showsAdditionalNutrition,
                 focusedField: focusedField
             )
 

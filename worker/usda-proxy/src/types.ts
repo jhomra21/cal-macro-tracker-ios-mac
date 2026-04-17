@@ -18,10 +18,24 @@ export interface OpenFoodFactsProxyNutriments {
   'proteins_serving'?: number
   'fat_serving'?: number
   'carbohydrates_serving'?: number
+  'saturated-fat_serving'?: number
+  'fiber_serving'?: number
+  'sugars_serving'?: number
+  'added-sugars_serving'?: number
+  'sodium_serving'?: number
+  'cholesterol_serving'?: number
+  'salt_serving'?: number
   'energy-kcal_100g'?: number
   'proteins_100g'?: number
   'fat_100g'?: number
   'carbohydrates_100g'?: number
+  'saturated-fat_100g'?: number
+  'fiber_100g'?: number
+  'sugars_100g'?: number
+  'added-sugars_100g'?: number
+  'sodium_100g'?: number
+  'cholesterol_100g'?: number
+  'salt_100g'?: number
 }
 
 export interface USDAProxyFoodResult {
@@ -35,10 +49,20 @@ export interface USDAProxyFoodResult {
   proteinPerServing: number
   fatPerServing: number
   carbsPerServing: number
+  saturatedFatPerServing?: number
+  fiberPerServing?: number
+  sugarsPerServing?: number
+  addedSugarsPerServing?: number
+  sodiumPerServing?: number
+  cholesterolPerServing?: number
   sourceName: string
   sourceURL: string
   barcode?: string
 }
+
+export type PackagedFoodSearchDegradedFallbackReason =
+  | 'openFoodFactsNoUsableResults'
+  | 'openFoodFactsUnavailable'
 
 export type PackagedFoodSearchResult =
   | {

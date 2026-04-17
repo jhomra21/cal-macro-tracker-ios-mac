@@ -5,6 +5,6 @@
   "compatibility_date": "2026-04-06",
   "compatibility_flags": ["nodejs_compat"],
   "secrets": {
-    "required": ["USDA_API_KEY"]
+    "required": ["USDA_API_KEY", "OPEN_FOOD_FACTS_USER_AGENT"]
   }
 }

@@ -279,6 +279,7 @@ The following planning documents have been fully consolidated into this file and
 - `scan-implementation-plan.md`
 - `food-search-implementation-plan.md`
 - `usda-proxy-implementation-plan.md`
+- `off-reliability-and-nutrients-plan.md`
 
 ## Macro Ring Architecture Refinement
 
@@ -466,3 +467,100 @@ The following planning documents have been fully consolidated into this file and
 - `make quality-format-check` passes.
 - iOS simulator app build passes.
 - iOS simulator widget build passes.
+
+## Open Food Facts Reliability, Secondary Nutrients, and Historical Repair
+
+### Delivered
+
+- Reworked packaged-food Worker reliability so default search gives Open Food Facts a bounded, rate-aware chance to recover before falling back to USDA.
+- Fixed cache behavior so transient Open Food Facts failures do not pin repeated default queries onto cached USDA fallback results.
+- Added background Open Food Facts cache warming plus lightweight, query-free search telemetry around attempts, cache hits, resolved provider, and degraded fallback reasons.
+- Added the first explicit secondary nutrient batch end-to-end across Worker contracts, app models, barcode/search ingestion, OCR parsing, persistence, and shared food-entry editors:
+  - `saturatedFatPerServing`
+  - `fiberPerServing`
+  - `sugarsPerServing`
+  - `addedSugarsPerServing`
+  - `sodiumPerServing`
+  - `cholesterolPerServing`
+- Hardened the root barcode/OCR implementation after review so Open Food Facts mixed-basis nutrient data and Nutrition Facts OCR edge cases map correctly.
+- Added repair/backfill support for existing foods and log entries, including bundled common foods, legacy reusable OFF/USDA foods, and historical entries linked through optional `foodItemID`.
+- Added a USDA food-details Worker route and app client for reusable-food repair.
+
+### Main implementation steps
+
+- Updated `worker/usda-proxy/` to use explicit Open Food Facts outcome handling, bounded retries with `Retry-After`/backoff behavior, degraded fallback metadata, and provider-safe cache policies.
+- Split packaged-food cache-key and write-policy behavior into `worker/usda-proxy/src/packagedFoodSearchCache.ts` so default, OFF-pinned, and USDA-pinned cache behavior stays explicit and traceable.
+- Added focused Worker tests for retry behavior, fallback behavior, pagination safety, cache-key behavior, and representative OFF/USDA nutrient payload mapping.
+- Extended explicit nutrient fields through `FoodDraft`, `FoodItem`, `LogEntry`, imported-data helpers, repositories, and `NutritionMath` instead of introducing a generic nutrient container.
+- Kept food-entry UX progressive: macros stay visible by default, secondary nutrients expand inline in the shared editor, and the `Show more` / `Show less` row now responds to taps across the whole row.
+- Fixed `BarcodeLookupMapper.swift` so required macros and optional nutrients can resolve from different OFF bases when that reflects the real payload.
+- Tightened `NutritionLabelParser.swift` and `NutritionLabelParserSupport.swift` so OCR parsing now handles comma-formatted numbers, explicit `g` / `mg` units, split added-sugars lines, safer multi-line serving-size blocks, and packaging-copy rejection.
+- Added `SecondaryNutrientRepairService.swift`, extended `CommonFoodSeedLoader.swift`, and updated bootstrap planning so installs with older local data can detect and repair missing secondary nutrients.
+- Kept historical entry editing snapshot-only by detaching stale `foodItemID` links when an edited log entry no longer matches its reusable-food source.
+- Added `worker/usda-proxy/src/index.ts` support for `/v1/usda/foods/:fdcId` and `USDAFoodDetailsClient.swift` on the app side so USDA-backed reusable foods can refresh against the correct details contract.
+
+### Bugs and implementation findings
+
+- The old provider-agnostic default cache key could let one transient Open Food Facts failure suppress the very next OFF retry by re-serving USDA fallback.
+- Worker configuration now requires `OPEN_FOOD_FACTS_USER_AGENT` alongside `USDA_API_KEY`; `.dev.vars.example`, `wrangler.jsonc`, and generated worker runtime types were updated so local/dev validation matches the deployed contract.
+- Open Food Facts mapping originally chose one nutrition basis too early, which could drop valid optional secondary nutrient values even when the payload contained them.
+- OCR parsing originally misread several realistic label forms:
+  - comma-formatted nutrient amounts
+  - `%DV`-only sodium/cholesterol lines
+  - split `Includes ... Added Sugars ...` lines
+  - serving-size continuations that accidentally swallowed packaging copy
+- Historical nutrient support needed a temporary repair path rather than only improving new-entry flows, because older reusable foods and stored log-entry snapshots were already missing the new fields.
+- USDA food-details responses do not match the USDA search payload shape; the final Worker mapping handles the real details nutrient schema (`amount` plus nested nutrient number) instead of assuming `nutrientId` / `value`.
+- Running all external-food repairs during launch created startup risk on offline or slow connections, so the network-backed repair pass now runs after the app reaches ready state.
+
+### Validation recorded during this work
+
+- `cd worker/usda-proxy && bun run check`
+- `cd worker/usda-proxy && bun test`
+- `make quality-format-check`
+- `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check`
+
+### Review-driven hardening follow-up
+
+- After five review passes on this uncommitted work, the remaining high-confidence fixes were no longer in OCR parsing or provider mapping but in the repair-state contract and Worker retry policy.
+- `FoodDraft` and `FoodDraftImportedData` now carry `secondaryNutrientBackfillState` so legacy `.needsRepair` / `.notRepairable` state is preserved through log, log-again, and edit flows instead of being dropped during draft conversion.
+- `SecondaryNutrientBackfillPolicy` now centralizes:
+  - legacy state inference from persisted `FoodItem` / `LogEntry` records
+  - new-record state resolution when a draft already carries repair provenance
+  - update-time transitions when someone changes serving or macro data without explicitly resolving secondary nutrients
+- After another root-cause validation pass, `SecondaryNutrientBackfillPolicy` now also returns a shared update resolution for reusable-food and log-entry edits, so basis-changing records with existing secondary nutrients no longer stay `.current` when those secondary fields were left untouched.
+- `LogEntryRepository.swift` no longer hard-codes new entries to `.current`; logging now preserves carried repair state when a draft originates from legacy data that still needs repair.
+- `FoodItemRepository.swift` now uses the same shared transition rules as `LogEntryRepository.swift`, so reusable-food edits and log-entry edits no longer drift in how they mark `.current`, `.needsRepair`, or `.notRepairable`.
+- `FoodDraftEditorForm.swift` now expands the secondary nutrient section by default whenever a draft already has secondary values, so editing an existing food or entry no longer hides the fields whose basis could be invalidated.
+- `LogEntryRepository.swift` now keeps historical entry edits snapshot-only; when an edited log entry no longer matches its linked reusable food, the entry detaches from `foodItemID` instead of mutating shared reusable-food state.
+- `SecondaryNutrientRepairService.swift` now uses entry-owned provenance first and then unambiguous saved external-food matches as a legacy fallback, so historical barcode/search entries can still be repaired even when older snapshots predate explicit external IDs.
+- `SecondaryNutrientRepairService.swift` now validates the reusable food's repair key before overlaying remote secondary nutrients; if a user-edited external food no longer matches the provider's serving/macro basis, the repair pass marks it `.notRepairable` instead of silently mixing user-edited macros with provider-derived secondary nutrients.
+- `SecondaryNutrientRepairTarget` now centralizes which saved external records are actually refreshable for secondary-nutrient repair, so repair state inference and repair execution no longer treat every stored external identifier as a valid remote lookup target.
+- `SecondaryNutrientRepairService.swift` now normalizes stale `.needsRepair` OFF/USDA records that do not have a real repair target to `.notRepairable` before network repair runs, preventing repeated launch-time retries for records that can never refresh successfully.
+- `OpenFoodFactsIdentity` was moved into shared model code so barcode normalization and qualified OFF identity rules stay consistent across the app, widget target, persistence, and repair logic instead of being redefined inside one client file.
+- `worker/usda-proxy/src/packagedFoods.ts` now treats `Retry-After` as a real lower bound; if the requested delay exceeds the local retry budget, the Worker stops retrying Open Food Facts and falls back instead of shortening the wait and re-hitting the provider early.
+- `worker/usda-proxy/src/index.ts` telemetry now only records operational metadata; raw packaged-food search queries are intentionally excluded from log payloads.
+- `worker/usda-proxy/src/packagedFoodSearchCache.ts` now keeps empty default Open Food Facts responses scoped to the `fallbackOnEmpty`-specific default cache key instead of sharing them through the generic `openFoodFacts` cache entry, and `worker/usda-proxy/tests/packagedFoods.test.ts` covers that regression explicitly.
+
+### Review findings validated and rejected
+
+- Confirmed bug: legacy repair state could be lost because the draft contract did not preserve it.
+- Confirmed bug: reusable external-food repair could overlay provider secondary nutrients onto user-edited serving/macro data without verifying the basis still matched.
+- Confirmed bug: Worker retry logic could shorten large `Retry-After` delays instead of respecting them as a minimum wait.
+- Confirmed bug: basis-changing edits with existing secondary nutrient data could still remain `.current` because the shared update policy did not distinguish hidden untouched secondary values from explicitly revalidated ones.
+- Confirmed bug: the shared Open Food Facts cache key could replay an empty `fallbackOnEmpty=false` default response into later `fallbackOnEmpty=true` requests, suppressing USDA widening for the same query.
+- Confirmed bug: historical Open Food Facts search results stored as `openfoodfacts:<_id>` could be marked repairable and later re-fetched through the barcode repair path even though `_id` is not a valid OFF barcode lookup target in this codebase.
+- Rejected candidate: fresh imported remote drafts defaulting to `.current` was not a bug in this codebase. The repair pipeline exists to backfill historical local foods and entries that predate secondary-nutrient support, not to mark newly imported provider payloads as stale on creation.
+- Rejected candidate: basis-changing edits should automatically clear already-present secondary nutrient fields. The root fix in this codebase is to stop hiding those fields during edits and to downgrade unresolved mismatches to `.notRepairable`, not to silently delete user-visible nutrient data.
+- Final follow-up review result: after introducing the shared repair-target contract and re-running validation, no new high-confidence actionable bugs were found in the resulting diff.
+
+### Validation recorded during this review follow-up
+
+- `cd worker/usda-proxy && bun run check`
+- `cd worker/usda-proxy && bun test`
+- `make quality-format-check`
+- `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check`

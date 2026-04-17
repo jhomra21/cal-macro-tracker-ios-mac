@@ -19,7 +19,13 @@ enum NutritionLabelParser {
                 caloriesPerServing: detectedNutrients.calories ?? 0,
                 proteinPerServing: detectedNutrients.protein ?? 0,
                 fatPerServing: detectedNutrients.fat ?? 0,
-                carbsPerServing: detectedNutrients.carbs ?? 0
+                carbsPerServing: detectedNutrients.carbs ?? 0,
+                saturatedFatPerServing: detectedNutrients.saturatedFat,
+                fiberPerServing: detectedNutrients.fiber,
+                sugarsPerServing: detectedNutrients.sugars,
+                addedSugarsPerServing: detectedNutrients.addedSugars,
+                sodiumPerServing: detectedNutrients.sodium,
+                cholesterolPerServing: detectedNutrients.cholesterol
             )
         )
 
@@ -36,26 +42,61 @@ enum NutritionLabelParser {
     private static func detectedNutrients(from lines: [String]) -> DetectedNutrients {
         DetectedNutrients(
             calories: nutrientValue(
-                matching: ["^\\s*calories\\b(?!\\s+from\\s+fat\\b)[^\\d]*(\\d+(?:\\.\\d+)?)"],
+                matching: ["^\\s*calories\\b(?!\\s+from\\s+fat\\b)[^\\d]*\(capturedNumberPattern)"],
                 in: lines
             ),
             protein: nutrientValue(
-                matching: ["^\\s*protein\\b[^\\d]*(\\d+(?:\\.\\d+)?)"],
+                matching: [amountPattern(labelPattern: "protein", unit: .grams)],
                 in: lines
             ),
             fat: nutrientValue(
                 matching: [
-                    "^\\s*total\\s+fat\\b[^\\d]*(\\d+(?:\\.\\d+)?)",
-                    "^\\s*fat\\b[^\\d]*(\\d+(?:\\.\\d+)?)"
+                    amountPattern(labelPattern: "total\\s+fat", unit: .grams),
+                    amountPattern(labelPattern: "fat", unit: .grams)
                 ],
                 in: lines
             ),
             carbs: nutrientValue(
                 matching: [
-                    "^\\s*total\\s+carbohydrates?\\b[^\\d]*(\\d+(?:\\.\\d+)?)",
-                    "^\\s*carbohydrates?\\b[^\\d]*(\\d+(?:\\.\\d+)?)",
-                    "^\\s*carbs?\\b[^\\d]*(\\d+(?:\\.\\d+)?)"
+                    amountPattern(labelPattern: "total\\s+carbohydrates?", unit: .grams),
+                    amountPattern(labelPattern: "carbohydrates?", unit: .grams),
+                    amountPattern(labelPattern: "carbs?", unit: .grams)
                 ],
+                in: lines
+            ),
+            saturatedFat: nutrientValue(
+                matching: [amountPattern(labelPattern: "saturated\\s+fat", unit: .grams)],
+                in: lines
+            ),
+            fiber: nutrientValue(
+                matching: [
+                    amountPattern(labelPattern: "dietary\\s+fiber", unit: .grams),
+                    amountPattern(labelPattern: "fiber", unit: .grams)
+                ],
+                in: lines
+            ),
+            sugars: nutrientValue(
+                matching: [
+                    amountPattern(labelPattern: "total\\s+sugars", unit: .grams),
+                    amountPattern(labelPattern: "sugars?", unit: .grams)
+                ],
+                in: lines
+            ),
+            addedSugars: nutrientValue(
+                matching: [
+                    "^\\s*includes\\b[^\\d]*\(capturedNumberPattern)\\s*g\\b\\s+added\\s+sugars\\b",
+                    amountPattern(labelPattern: "added\\s+sugars", unit: .grams)
+                ],
+                in: lines
+            ),
+            sodium: nutrientValue(
+                matching: [amountPattern(labelPattern: "sodium", unit: .milligrams)],
+                orPercentDailyValueFor: .sodium,
+                in: lines
+            ),
+            cholesterol: nutrientValue(
+                matching: [amountPattern(labelPattern: "cholesterol", unit: .milligrams)],
+                orPercentDailyValueFor: .cholesterol,
                 in: lines
             )
         )
@@ -73,16 +114,16 @@ enum NutritionLabelParser {
         for (index, line) in parsedText.lines.enumerated() {
             guard isServingSizeLine(line) else { continue }
 
-            let continuation = servingSizeContinuation(after: index, in: parsedText.lines)
+            let continuations = servingSizeContinuations(after: index, in: parsedText.lines)
             if let inlineValue = servingSizeValue(from: line), inlineValue.isEmpty == false {
-                if let continuation {
-                    return "\(line) \(continuation)"
+                if continuations.isEmpty == false {
+                    return ([line] + continuations).joined(separator: " ")
                 }
                 return line
             }
 
-            if let continuation {
-                return "Serving size \(continuation)"
+            if continuations.isEmpty == false {
+                return ([line] + continuations).joined(separator: " ")
             }
         }
 
@@ -102,12 +143,32 @@ enum NutritionLabelParser {
     }
 
     private static func nutrientValue(matching patterns: [String], in lines: [String]) -> Double? {
+        nutrientValue(matching: patterns, orPercentDailyValueFor: nil, in: lines)
+    }
+
+    private static func nutrientValue(
+        matching patterns: [String],
+        orPercentDailyValueFor nutrient: PercentDailyValueNutrient?,
+        in lines: [String]
+    ) -> Double? {
         for index in lines.indices {
             for candidate in nutrientCandidateTexts(at: index, in: lines) {
                 for pattern in patterns {
                     if let value = firstMatch(in: candidate, pattern: pattern) {
                         return value
                     }
+                }
+
+                if let nutrient,
+                    let percentDailyValue = firstMatch(
+                        in: candidate,
+                        pattern: percentDailyValuePattern(labelPattern: nutrient.labelPattern)
+                    )
+                {
+                    return nutrientAmountFromPercentDailyValue(
+                        percentDailyValue,
+                        dailyValueMilligrams: nutrient.dailyValueMilligrams
+                    )
                 }
             }
         }
@@ -116,37 +177,54 @@ enum NutritionLabelParser {
     }
 
     private static func servingGrams(in text: String) -> Double? {
-        firstMatch(in: text, pattern: "\\((\\d+(?:\\.\\d+)?)\\s*g\\)")
-            ?? firstMatch(in: text, pattern: "\\b(\\d+(?:\\.\\d+)?)\\s*g\\b")
+        firstMatch(in: text, pattern: "\\(\(capturedNumberPattern)\\s*g\\)")
+            ?? firstMatch(in: text, pattern: "\\b\(capturedNumberPattern)\\s*g\\b")
     }
 
-    private static func servingSizeContinuation(after index: Int, in lines: [String]) -> String? {
-        let nextIndex = lines.index(after: index)
-        guard nextIndex < lines.endIndex else { return nil }
+    private static func servingSizeContinuations(after index: Int, in lines: [String]) -> [String] {
+        var continuations: [String] = []
+        var nextIndex = lines.index(after: index)
 
-        let continuation = lines[nextIndex]
-        return isServingSizeContinuation(continuation) ? continuation : nil
+        while nextIndex < lines.endIndex {
+            let continuation = lines[nextIndex]
+            guard isServingSizeContinuation(continuation) else { break }
+            continuations.append(continuation)
+            nextIndex = lines.index(after: nextIndex)
+        }
+
+        return continuations
     }
 
     private static func servingSizeCandidateTexts(at index: Int, in lines: [String]) -> [String] {
         let line = lines[index]
-        if let continuation = servingSizeContinuation(after: index, in: lines) {
-            return [line, "\(line) \(continuation)"]
+        let continuations = servingSizeContinuations(after: index, in: lines)
+        guard continuations.isEmpty == false else { return [line] }
+
+        var candidates = [line]
+        var combinedLine = line
+        for continuation in continuations {
+            combinedLine += " \(continuation)"
+            candidates.append(combinedLine)
         }
 
-        return [line]
+        return candidates
     }
 
     private static func nutrientCandidateTexts(at index: Int, in lines: [String]) -> [String] {
         let line = lines[index]
-        guard containsPattern("\\d", in: line) == false else { return [line] }
-
         let nextIndex = lines.index(after: index)
         guard nextIndex < lines.endIndex else { return [line] }
 
         let nextLine = lines[nextIndex]
-        guard isNutrientValueContinuation(nextLine) else { return [line] }
+        if containsPattern("\\d", in: line) == false {
+            guard isNutrientValueContinuation(nextLine) else { return [line] }
+            return ["\(line) \(nextLine)"]
+        }
 
-        return ["\(line) \(nextLine)"]
+        if isAddedSugarsAmountLine(line), isAddedSugarsLabelContinuation(nextLine) {
+            return ["\(line) \(nextLine)", line]
+        }
+
+        return [line]
     }
 }

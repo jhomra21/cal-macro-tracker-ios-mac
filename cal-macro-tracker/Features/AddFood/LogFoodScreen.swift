@@ -85,7 +85,7 @@ struct LogFoodScreen: View {
             brandPrompt: "Brand (optional)",
             gramsPrompt: "Grams per serving (optional)",
             focusedField: $focusedField,
-            keyboardFields: FoodDraftField.formOrder,
+            trailingKeyboardFields: [],
             previewTotals: nil
         ) {
             if shouldShowReviewSection {

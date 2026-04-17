@@ -17,6 +17,13 @@ final class FoodItem {
     var proteinPerServing: Double
     var fatPerServing: Double
     var carbsPerServing: Double
+    var saturatedFatPerServing: Double?
+    var fiberPerServing: Double?
+    var sugarsPerServing: Double?
+    var addedSugarsPerServing: Double?
+    var sodiumPerServing: Double?
+    var cholesterolPerServing: Double?
+    var secondaryNutrientBackfillStateRaw: String?
     var searchableText: String
     var createdAt: Date
     var updatedAt: Date
@@ -36,6 +43,13 @@ final class FoodItem {
         proteinPerServing: Double,
         fatPerServing: Double,
         carbsPerServing: Double,
+        saturatedFatPerServing: Double? = nil,
+        fiberPerServing: Double? = nil,
+        sugarsPerServing: Double? = nil,
+        addedSugarsPerServing: Double? = nil,
+        sodiumPerServing: Double? = nil,
+        cholesterolPerServing: Double? = nil,
+        secondaryNutrientBackfillState: SecondaryNutrientBackfillState? = .current,
         aliases: [String] = [],
         createdAt: Date = .now,
         updatedAt: Date = .now
@@ -54,6 +68,13 @@ final class FoodItem {
         self.proteinPerServing = proteinPerServing
         self.fatPerServing = fatPerServing
         self.carbsPerServing = carbsPerServing
+        self.saturatedFatPerServing = saturatedFatPerServing
+        self.fiberPerServing = fiberPerServing
+        self.sugarsPerServing = sugarsPerServing
+        self.addedSugarsPerServing = addedSugarsPerServing
+        self.sodiumPerServing = sodiumPerServing
+        self.cholesterolPerServing = cholesterolPerServing
+        self.secondaryNutrientBackfillStateRaw = secondaryNutrientBackfillState?.rawValue
         self.searchableText = FoodItem.makeSearchableText(name: name, brand: brand, barcode: barcode, aliases: aliases)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -61,6 +82,25 @@ final class FoodItem {
 
     var sourceKind: FoodSource {
         FoodSource(rawValue: source) ?? .custom
+    }
+
+    var isMissingAllSecondaryNutrients: Bool {
+        saturatedFatPerServing == nil
+            && fiberPerServing == nil
+            && sugarsPerServing == nil
+            && addedSugarsPerServing == nil
+            && sodiumPerServing == nil
+            && cholesterolPerServing == nil
+    }
+
+    var secondaryNutrientBackfillState: SecondaryNutrientBackfillState? {
+        get {
+            guard let secondaryNutrientBackfillStateRaw else { return nil }
+            return SecondaryNutrientBackfillState(rawValue: secondaryNutrientBackfillStateRaw)
+        }
+        set {
+            secondaryNutrientBackfillStateRaw = newValue?.rawValue
+        }
     }
 
     var expectedSearchableText: String {

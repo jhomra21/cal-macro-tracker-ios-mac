@@ -1,11 +1,47 @@
 import Foundation
 
 extension NutritionLabelParser {
+    static let capturedNumberPattern = "((?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?)(?!,\\d)"
+
+    enum NutrientAmountUnit: String {
+        case grams = "g"
+        case milligrams = "mg"
+    }
+
+    enum PercentDailyValueNutrient {
+        case sodium
+        case cholesterol
+
+        var labelPattern: String {
+            switch self {
+            case .sodium:
+                "sodium"
+            case .cholesterol:
+                "cholesterol"
+            }
+        }
+
+        var dailyValueMilligrams: Double {
+            switch self {
+            case .sodium:
+                2_300
+            case .cholesterol:
+                300
+            }
+        }
+    }
+
     struct DetectedNutrients {
         let calories: Double?
         let protein: Double?
         let fat: Double?
         let carbs: Double?
+        let saturatedFat: Double?
+        let fiber: Double?
+        let sugars: Double?
+        let addedSugars: Double?
+        let sodium: Double?
+        let cholesterol: Double?
     }
 
     struct ParsedLabelText {
@@ -41,7 +77,7 @@ extension NutritionLabelParser {
             return nil
         }
 
-        return Double(text[valueRange])
+        return parsedNumber(from: String(text[valueRange]))
     }
 
     static func firstTextMatch(in text: String, pattern: String) -> String? {
@@ -76,12 +112,21 @@ extension NutritionLabelParser {
 
     static func isServingSizeContinuation(_ line: String) -> Bool {
         guard isNutritionBlockLine(line) == false else { return false }
+        guard isPackagingCopyLine(line) == false else { return false }
         return line.rangeOfCharacter(from: .letters) != nil || line.rangeOfCharacter(from: .decimalDigits) != nil
     }
 
     static func isNutrientValueContinuation(_ line: String) -> Bool {
         guard isNutritionBlockLine(line) == false else { return false }
         return containsPattern("^\\s*[<~]?\\s*\\d", in: line)
+    }
+
+    static func isAddedSugarsAmountLine(_ line: String) -> Bool {
+        containsPattern("^\\s*includes\\b", in: line) && containsPattern("\\d", in: line)
+    }
+
+    static func isAddedSugarsLabelContinuation(_ line: String) -> Bool {
+        containsPattern("^\\s*added\\s+sugars\\b", in: line)
     }
 
     static func isNutritionBlockLine(_ line: String) -> Bool {
@@ -105,13 +150,18 @@ extension NutritionLabelParser {
             || containsPattern("^\\s*protein\\b", in: line)
             || containsPattern("^\\s*total\\s+fat\\b", in: line)
             || containsPattern("^\\s*fat\\b", in: line)
+            || containsPattern("^\\s*saturated\\s+fat\\b", in: line)
             || containsPattern("^\\s*total\\s+carbohydrates?\\b", in: line)
             || containsPattern("^\\s*carbohydrates?\\b", in: line)
             || containsPattern("^\\s*carbs?\\b", in: line)
             || containsPattern("^\\s*sodium\\b", in: line)
             || containsPattern("^\\s*cholesterol\\b", in: line)
+            || containsPattern("^\\s*dietary\\s+fiber\\b", in: line)
             || containsPattern("^\\s*fiber\\b", in: line)
+            || containsPattern("^\\s*total\\s+sugars\\b", in: line)
             || containsPattern("^\\s*sugars?\\b", in: line)
+            || containsPattern("^\\s*includes\\b.*\\badded\\s+sugars\\b", in: line)
+            || containsPattern("^\\s*added\\s+sugars\\b", in: line)
             || containsPattern("^\\s*potassium\\b", in: line)
             || containsPattern("^\\s*calcium\\b", in: line)
             || containsPattern("^\\s*iron\\b", in: line)
@@ -123,7 +173,7 @@ extension NutritionLabelParser {
 
     static func isPlainNutrientLabelLine(_ line: String) -> Bool {
         containsPattern(
-            "^\\s*(?:calories|protein|total\\s+fat|fat|total\\s+carbohydrates?|carbohydrates?|carbs?|sodium|cholesterol|fiber|sugars?|potassium|calcium|iron)\\s*[:*]*\\s*$",
+            "^\\s*(?:calories|protein|total\\s+fat|fat|saturated\\s+fat|total\\s+carbohydrates?|carbohydrates?|carbs?|sodium|cholesterol|dietary\\s+fiber|fiber|total\\s+sugars|sugars?|added\\s+sugars|potassium|calcium|iron)\\s*[:*]*\\s*$",
             in: line
         )
     }
@@ -136,6 +186,25 @@ extension NutritionLabelParser {
 
     static func containsPattern(_ pattern: String, in line: String) -> Bool {
         line.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    static func parsedNumber(from text: String) -> Double? {
+        Double(text.replacingOccurrences(of: ",", with: ""))
+    }
+
+    static func amountPattern(labelPattern: String, unit: NutrientAmountUnit) -> String {
+        "^\\s*\(labelPattern)\\b[^\\d]*\(capturedNumberPattern)\\s*\(unit.rawValue)\\b"
+    }
+
+    static func percentDailyValuePattern(labelPattern: String) -> String {
+        "^\\s*\(labelPattern)\\b[^\\d%]*[<~]?\\s*\(capturedNumberPattern)\\s*%"
+    }
+
+    static func nutrientAmountFromPercentDailyValue(
+        _ percentDailyValue: Double,
+        dailyValueMilligrams: Double
+    ) -> Double {
+        (percentDailyValue / 100) * dailyValueMilligrams
     }
 
     static func notes(
