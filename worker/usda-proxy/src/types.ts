@@ -1,5 +1,10 @@
 export type SearchProvider = 'openFoodFacts' | 'usda'
 
+export type HTTPFetcher = (
+  input: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) => ReturnType<typeof fetch>
+
 export interface OpenFoodFactsProxyProduct {
   externalProductID?: string
   code?: string

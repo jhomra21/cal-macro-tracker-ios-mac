@@ -1,5 +1,6 @@
 import { OpenFoodFactsClientError, searchOpenFoodFactsFoods } from './openFoodFacts'
 import type {
+  HTTPFetcher,
   PackagedFoodSearchDegradedFallbackReason,
   PackagedFoodSearchQuery,
   PackagedFoodSearchResponse,
@@ -34,7 +35,7 @@ export async function searchPackagedFoods(
   input: PackagedFoodSearchQuery,
   apiKey: string,
   openFoodFactsUserAgent: string,
-  fetcher: typeof fetch = fetch,
+  fetcher: HTTPFetcher = fetch,
   retryWait: RetryWait = defaultRetryWait,
 ): Promise<PackagedFoodSearchExecution> {
   if (input.provider === OPEN_FOOD_FACTS_PROVIDER) {
@@ -73,7 +74,7 @@ export async function searchPackagedFoods(
 async function searchOpenFoodFactsWithOutcome(
   input: PackagedFoodSearchQuery,
   userAgent: string,
-  fetcher: typeof fetch,
+  fetcher: HTTPFetcher,
   retryWait: RetryWait,
 ): Promise<OpenFoodFactsSearchOutcome> {
   let lastError: OpenFoodFactsClientError | null = null
@@ -128,7 +129,7 @@ async function searchOpenFoodFactsWithOutcome(
 async function searchOpenFoodFactsPackagedFoods(
   input: PackagedFoodSearchQuery,
   userAgent: string,
-  fetcher: typeof fetch,
+  fetcher: HTTPFetcher,
   retryWait: RetryWait,
 ): Promise<PackagedFoodSearchExecution> {
   const outcome = await searchOpenFoodFactsWithOutcome(input, userAgent, fetcher, retryWait)
@@ -142,7 +143,7 @@ async function searchOpenFoodFactsPackagedFoods(
 async function searchUSDAPackagedFoods(
   input: PackagedFoodSearchQuery,
   apiKey: string,
-  fetcher: typeof fetch,
+  fetcher: HTTPFetcher,
   degradedFallbackReason?: PackagedFoodSearchDegradedFallbackReason,
   openFoodFactsAttemptCount?: number,
 ): Promise<PackagedFoodSearchExecution> {
@@ -240,7 +241,7 @@ function clampDelay(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
-function withTimeout(fetcher: typeof fetch, timeoutMs: number): typeof fetch {
+function withTimeout(fetcher: HTTPFetcher, timeoutMs: number): HTTPFetcher {
   return (input, init) => {
     const timeoutSignal = AbortSignal.timeout(timeoutMs)
     const signal = init?.signal == null ? timeoutSignal : AbortSignal.any([init.signal, timeoutSignal])

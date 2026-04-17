@@ -1,4 +1,9 @@
-import type { OpenFoodFactsProxyNutriments, OpenFoodFactsProxyProduct, ProviderPage } from './types'
+import type {
+  HTTPFetcher,
+  OpenFoodFactsProxyNutriments,
+  OpenFoodFactsProxyProduct,
+  ProviderPage,
+} from './types'
 
 const OPEN_FOOD_FACTS_SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl'
 const SEARCH_FIELDS = [
@@ -64,7 +69,7 @@ export interface OpenFoodFactsRequestOptions {
 export async function searchOpenFoodFactsFoods(
   input: OpenFoodFactsQuery,
   options: OpenFoodFactsRequestOptions,
-  fetcher: typeof fetch = fetch,
+  fetcher: HTTPFetcher = fetch,
 ): Promise<ProviderPage<OpenFoodFactsProxyProduct>> {
   const requestedPage = Math.max(1, input.page)
   const requestedPageSize = Math.max(1, input.pageSize)
@@ -105,7 +110,7 @@ export async function searchOpenFoodFactsFoods(
 async function fetchOpenFoodFactsPage(
   input: OpenFoodFactsQuery,
   options: OpenFoodFactsRequestOptions,
-  fetcher: typeof fetch,
+  fetcher: HTTPFetcher,
 ): Promise<OpenFoodFactsRawPage> {
   const response = await fetcher(buildSearchURL(input), {
     headers: {

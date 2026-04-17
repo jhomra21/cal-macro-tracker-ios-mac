@@ -543,6 +543,8 @@ The following planning documents have been fully consolidated into this file and
 - `worker/usda-proxy/src/packagedFoods.ts` now treats `Retry-After` as a real lower bound; if the requested delay exceeds the local retry budget, the Worker stops retrying Open Food Facts and falls back instead of shortening the wait and re-hitting the provider early.
 - `worker/usda-proxy/src/index.ts` telemetry now only records operational metadata; raw packaged-food search queries are intentionally excluded from log payloads.
 - `worker/usda-proxy/src/packagedFoodSearchCache.ts` now keeps empty default Open Food Facts responses scoped to the `fallbackOnEmpty`-specific default cache key instead of sharing them through the generic `openFoodFacts` cache entry, and `worker/usda-proxy/tests/packagedFoods.test.ts` covers that regression explicitly.
+- `worker/usda-proxy/package.json` now installs `@types/bun`, and `worker/usda-proxy/tsconfig.json` now loads Bun types plus `tests/**/*.ts`, so editor/typecheck diagnostics resolve `bun:test` instead of treating the Bun test files as missing-module errors.
+- Worker fetch injection now uses a small `HTTPFetcher` call-signature type instead of `typeof fetch`, so Bun's extra static `fetch` properties do not leak into unit-test doubles while keeping the mocked HTTP tests type-safe.
 
 ### Review findings validated and rejected
 
@@ -560,6 +562,7 @@ The following planning documents have been fully consolidated into this file and
 
 - `cd worker/usda-proxy && bun run check`
 - `cd worker/usda-proxy && bun test`
+- Reload the editor TypeScript server after adding Bun types if stale `bun:test` diagnostics remain open in an existing workspace.
 - `make quality-format-check`
 - `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
 - `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`

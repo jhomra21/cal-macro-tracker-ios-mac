@@ -1,4 +1,4 @@
-import type { USDAProxyFoodResult, USDAProxySearchResponse } from './types'
+import type { HTTPFetcher, USDAProxyFoodResult, USDAProxySearchResponse } from './types'
 
 const USDA_SEARCH_URL = 'https://api.nal.usda.gov/fdc/v1/foods/search'
 const USDA_FOOD_DETAILS_URL = 'https://api.nal.usda.gov/fdc/v1/food'
@@ -81,7 +81,7 @@ export interface USDAQuery {
 export async function searchUSDAFoods(
   input: USDAQuery,
   apiKey: string,
-  fetcher: typeof fetch = fetch,
+  fetcher: HTTPFetcher = fetch,
 ): Promise<USDAProxySearchResponse> {
   const response = await fetcher(buildSearchURL(apiKey), {
     method: 'POST',
@@ -134,7 +134,7 @@ export async function searchUSDAFoods(
 export async function fetchUSDAFood(
   fdcId: number,
   apiKey: string,
-  fetcher: typeof fetch = fetch,
+  fetcher: HTTPFetcher = fetch,
 ): Promise<USDAProxyFoodResult> {
   const response = await fetcher(buildFoodDetailsURL(apiKey, fdcId), {
     method: 'GET',
