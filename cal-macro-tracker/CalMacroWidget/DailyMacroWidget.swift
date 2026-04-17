@@ -93,11 +93,7 @@ private struct DailyMacroWidgetContentView: View {
             .widgetAccentable()
             .frame(maxWidth: .infinity)
 
-            HStack(spacing: 10) {
-                ForEach(MacroMetric.allCases) { metric in
-                    smallMetric(metric: metric)
-                }
-            }
+            smallMetricsRow
         }
         .padding(12)
     }
@@ -130,17 +126,52 @@ private struct DailyMacroWidgetContentView: View {
         .padding(16)
     }
 
-    private func smallMetric(metric: MacroMetric) -> some View {
-        VStack(spacing: 3) {
+    private var smallMetricValues: [String] {
+        MacroMetric.allCases.map(smallMetricValue(for:))
+    }
+
+    private var smallMetricValueFontSize: CGFloat {
+        let widestValueLength = smallMetricValues.map(\.count).max() ?? 1
+
+        switch widestValueLength {
+        case 0...2:
+            return 22
+        case 3:
+            return 18
+        default:
+            return 14
+        }
+    }
+
+    private var smallMetricsRow: some View {
+        HStack(spacing: 6) {
+            ForEach(MacroMetric.allCases) { metric in
+                smallMetric(metric: metric, value: smallMetricValue(for: metric), fontSize: smallMetricValueFontSize)
+            }
+        }
+    }
+
+    private func smallMetricValue(for metric: MacroMetric) -> String {
+        metric.value(from: entry.snapshot.totals).roundedForDisplay
+    }
+
+    private func smallMetric(metric: MacroMetric, value: String, fontSize: CGFloat) -> some View {
+        return VStack(spacing: 3) {
             Text(metric.shortTitle)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Text(metric.value(from: entry.snapshot.totals).roundedForDisplay)
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
+            smallMetricValueText(value, fontSize: fontSize)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func smallMetricValueText(_ value: String, fontSize: CGFloat) -> some View {
+        return Text(value)
+            .font(.system(size: fontSize, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .lineLimit(1)
+            .allowsTightening(true)
     }
 
     private func mediumMetric(metric: MacroMetric) -> some View {

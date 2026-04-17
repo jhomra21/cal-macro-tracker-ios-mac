@@ -597,3 +597,30 @@ The following planning documents have been fully consolidated into this file and
 - `make quality-format-check`
 - `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build`
 - `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`
+
+## Small Daily Macro Widget Value Sizing Follow-up
+
+### Delivered
+
+- Fixed the small Home Screen daily macro widget so side macro values no longer truncate when one or more values include decimals.
+- Kept the row visually balanced by using one shared value size for all three macro columns in the small widget.
+- Reviewed the final implementation and removed unnecessary index-coupled lookup code after the sizing fix was proven out.
+
+### Main implementation steps
+
+- Updated `cal-macro-tracker/CalMacroWidget/DailyMacroWidget.swift` so the small widget uses a deterministic shared font size for the `P / C / F` value row.
+- Chose the shared font size from the longest rendered macro value string in the current snapshot instead of letting each value size independently.
+- Kept the small widget row compact with the existing equal-width three-column layout and a tighter horizontal spacing value.
+- Simplified the final row rendering by replacing the temporary enumerated array/index lookup with a direct `smallMetricValue(for:)` helper.
+
+### Bugs and implementation findings
+
+- Independent per-value sizing made shorter values look louder than longer values, which felt visually unbalanced in the compact three-column row.
+- A shared `ViewThatFits` row-level approach was still not reliable here because equal-width columns could report a row that fit while the side values still truncated inside their own columns.
+- The more reliable solution in this widget was a simple deterministic mapping from widest rendered value length to one shared font size for the whole row.
+- After the cleanup pass, no redundant code, dead code, or simpler high-confidence implementation remained for this widget behavior.
+
+### Validation recorded during this work
+
+- `make quality-format-check`
+- `xcodebuild -project /Users/juan/Documents/xcode/cal-macro-tracker/cal-macro-tracker.xcodeproj -scheme cal-macro-tracker -configuration Debug -destination 'generic/platform=iOS Simulator' build`
